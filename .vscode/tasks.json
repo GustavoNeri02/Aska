@@ -1,0 +1,86 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Aska: executar",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "run",
+        "aska"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "UV: sync",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "sync"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Ruff: formatar",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "run",
+        "ruff",
+        "format",
+        "."
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Ruff: verificar",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "run",
+        "ruff",
+        "check",
+        "."
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pytest: executar",
+      "type": "process",
+      "command": "uv",
+      "args": [
+        "run",
+        "pytest"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "test"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Aska: qualidade completa",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Ruff: formatar",
+        "Ruff: verificar",
+        "Pytest: executar"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

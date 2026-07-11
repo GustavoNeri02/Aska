@@ -1,7 +1,6 @@
 __pycache__/
 .pytest_cache/
 .venv/
-.vscode/
 
 *.pyc
 aska.egg-info/

@@ -1,8 +1,5 @@
 from collections.abc import Callable
 
-APP_NAME = "Aska"
-APP_VERSION = "0.1.0"
-
 EXIT_COMMANDS = frozenset(
     {
         "sair",
