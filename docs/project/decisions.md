@@ -22,6 +22,14 @@ Abstrações e módulos entram apenas para resolver necessidades reais. O projet
 
 Documentos temáticos em Markdown são a fonte de verdade. O espelho JSON foi removido porque não possuía consumidor e criava risco de divergência.
 
+### Ollama como primeiro provider local — `implemented`
+
+O primeiro adaptador usa a API HTTP local do Ollama atrás do contrato `ModelProvider`. A integração utiliza a biblioteca padrão do Python, sem SDK ou dependência de runtime, e não impede adaptadores futuros.
+
+### Gemma 3 12B como primeiro modelo local — `implemented`
+
+O modelo padrão é `gemma3:12b`, adequado à GPU principal com 16 GB de VRAM. A escolha permanece configurável por `ASKA_MODEL` e não faz parte do contrato interno.
+
 ## Decisões substituídas, rejeitadas ou adiadas
 
 - Automação como núcleo — `superseded` por conversa e IA pessoal como núcleo.
@@ -39,9 +47,7 @@ Documentos temáticos em Markdown são a fonte de verdade. O espelho JSON foi re
 
 ## Decisões abertas
 
-- Primeiro runtime local: Ollama, llama.cpp ou LM Studio.
-- Primeiro modelo local adequado ao hardware e ao objetivo.
-- Contrato de mensagens e provider.
+- Evolução do contrato de mensagens quando contexto de sessão for implementado.
 - Persistência inicial da memória: JSON, SQLite ou alternativa simples.
 - Momento de separar `packages/conversation` e `packages/models`.
 - Formato do manifesto de capabilities.

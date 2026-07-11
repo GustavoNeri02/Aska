@@ -42,7 +42,7 @@ O modelo é um componente usado pela conversa e pelo raciocínio, não o sistema
 - Interfaces de usuário não contêm lógica de IA, memória ou ferramentas.
 - Ações do sistema passam por política de segurança antes da execução.
 
-Providers locais possíveis incluem Ollama, llama.cpp, LM Studio e, futuramente, vLLM. Gemini, ChatGPT e outras IAs externas podem ajudar no desenvolvimento, mas não são dependências de runtime.
+O contrato interno `ModelProvider` define a geração de respostas sem expor detalhes de infraestrutura. O primeiro adaptador implementado usa a API HTTP local do Ollama. llama.cpp, LM Studio e vLLM continuam alternativas futuras. Gemini, ChatGPT e outras IAs externas podem ajudar no desenvolvimento, mas não são dependências de runtime.
 
 ## Monorepo
 
