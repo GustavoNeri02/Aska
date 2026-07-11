@@ -1,0 +1,71 @@
+Project Atlas - Documento de Arquitetura (MVP)
+
+VISÃO
+Construir um assistente pessoal de IA modular capaz de compreender contexto, executar ferramentas, interagir com o computador, analisar código e evoluir para visão computacional e voz.
+
+Princípios
+- Arquitetura antes de funcionalidades.
+- Componentes independentes.
+- Troca de modelo de IA sem alterar o restante do sistema.
+- Segurança em primeiro lugar.
+
+Arquitetura
+
+Usuário
+  |
+  v
+ Core
+  |-- Models (Gemini/OpenAI/Ollama)
+  |-- Planner
+  |-- Memory
+  |-- Tools
+  |-- Vision
+  |-- Voice
+  |-- Plugins
+
+Fases
+1. Chat + ferramentas.
+2. Memória.
+3. Visão.
+4. Agente autônomo.
+5. Voz.
+
+Stack
+- Python 3.13
+- uv
+- FastAPI
+- SQLite
+- Flutter Desktop (futuro)
+- Pydantic
+- Ruff
+- Pytest
+
+Estrutura
+
+assistant/
+  app/
+  core/
+  models/
+  planner/
+  memory/
+  tools/
+  vision/
+  voice/
+  plugins/
+  config/
+  tests/
+
+Fluxo
+
+Usuário -> Planner -> LLM -> Ferramenta -> Resultado -> Memória -> Resposta
+
+Ferramentas iniciais
+- read_file
+- write_file
+- execute_terminal
+- search_code
+- open_app
+- take_screenshot
+
+Objetivo final
+Um assistente que conheça seus projetos, automatize tarefas e possa evoluir continuamente sem reescrever a base.
