@@ -2,8 +2,8 @@ import os
 from collections.abc import Callable
 
 from apps.cli.commands import ExitCommand, MemoryCommand
+from packages.memory import JsonMemoryStore, MemoryRepository, ReplaceResult
 from packages.models import ModelProvider, ModelProviderError, OllamaProvider
-from packages.runtime.memory import MemoryStore, ReplaceResult
 
 
 def build_banner() -> str:
@@ -44,7 +44,7 @@ def _build_context_message(
 
 def run_conversation_loop(
     provider: ModelProvider,
-    memory_store: MemoryStore,
+    memory_store: MemoryRepository,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
 ) -> None:
@@ -76,7 +76,7 @@ def run_conversation_loop(
             output_writer("Memórias locais:")
             if memories:
                 for memory in memories:
-                    output_writer(memory)
+                    output_writer(memory.content)
             else:
                 output_writer("(nenhuma memória registrada)")
             continue
@@ -128,12 +128,13 @@ def run_conversation_loop(
             if matches:
                 output_writer("Resultados da busca:")
                 for memory in matches:
-                    output_writer(memory)
+                    output_writer(memory.content)
             else:
                 output_writer("Nenhuma memória encontrada para o termo.")
             continue
 
-        context_message = _build_context_message(session_history, message, memory_store.list())
+        memory_contents = [memory.content for memory in memory_store.list()]
+        context_message = _build_context_message(session_history, message, memory_contents)
 
         try:
             response = provider.generate(context_message)
@@ -150,7 +151,7 @@ def main() -> None:
         model=os.getenv("ASKA_MODEL", "gemma3:12b"),
         base_url=os.getenv("ASKA_OLLAMA_URL", "http://localhost:11434"),
     )
-    run_conversation_loop(provider, memory_store=MemoryStore(path="data/memory/memories.json"))
+    run_conversation_loop(provider, memory_store=JsonMemoryStore(path="data/memory/memories.json"))
 
 
 if __name__ == "__main__":

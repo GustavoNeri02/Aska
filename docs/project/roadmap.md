@@ -29,19 +29,19 @@
 ### Comportamento atual
 
 - Session Context está implementado e usa histórico em memória durante a conversa atual.
-- Persistent Memory está `in_progress` e já suporta persistência JSON simples, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
+- Persistent Memory está `in_progress` e já suporta persistência JSON estruturada com identidade e metadados mínimos, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
 - O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.
 
 ### Incremento atual de memória explícita
 
-O primeiro incremento de Persistent Memory já implementa persistência JSON simples, registro explícito por `lembrar:`, listagem por `memórias`, pesquisa textual por `buscar memória:` e carregamento das memórias persistidas em cada interação conversacional, inclusive após novas execuções.
+O incremento atual de Persistent Memory implementa exclusivamente objetos com `id`, `content`, `source`, `created_at` e `updated_at` em JSON. O CLI continua expondo os comandos atuais e envia somente o conteúdo das memórias ao modelo.
 
 ### Limitações atuais do incremento
 
 - Todas as memórias salvas são enviadas em todas as requisições ao modelo.
 - Não há seleção por relevância, compactação ou orçamento de tokens.
-- Memórias ainda são texto livre serializado pelo CLI.
-- Metadados e explicabilidade continuam pendentes.
+- JSON continua sendo o armazenamento atual; SQLite é uma evolução provável, ainda não adotada.
+- Tipos avançados, seleção semântica e explicabilidade além dos metadados mínimos continuam pendentes.
 
 ## Roadmap
 

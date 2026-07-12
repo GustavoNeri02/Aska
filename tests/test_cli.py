@@ -1,4 +1,3 @@
-import json
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -8,8 +7,13 @@ from apps.cli.app import (
     build_banner,
     run_conversation_loop,
 )
+from packages.memory import JsonMemoryStore as MemoryStore
+from packages.memory import Memory, ReplaceResult
 from packages.models import ModelProviderError
-from packages.runtime.memory import MemoryStore, ReplaceResult
+
+
+def memory_contents(memories: list[Memory]) -> list[str]:
+    return [memory.content for memory in memories]
 
 
 def create_memory_store(tmp_path: Path) -> MemoryStore:
@@ -164,7 +168,7 @@ def test_memory_store_persists_memories_to_disk(tmp_path: Path) -> None:
 
     store.add("gosto de python")
 
-    assert store.list() == ["gosto de python"]
+    assert memory_contents(store.list()) == ["gosto de python"]
     assert (tmp_path / "memories.json").exists()
 
 
@@ -173,7 +177,7 @@ def test_memory_store_ignores_blank_entries(tmp_path: Path) -> None:
 
     store.add("   ")
 
-    assert store.list() == []
+    assert memory_contents(store.list()) == []
 
 
 def test_memory_store_does_not_store_duplicates(tmp_path: Path) -> None:
@@ -182,7 +186,7 @@ def test_memory_store_does_not_store_duplicates(tmp_path: Path) -> None:
     store.add("gosto de python")
     store.add("gosto de python")
 
-    assert store.list() == ["gosto de python"]
+    assert memory_contents(store.list()) == ["gosto de python"]
 
 
 def test_memory_store_persists_between_instances(tmp_path: Path) -> None:
@@ -192,7 +196,7 @@ def test_memory_store_persists_between_instances(tmp_path: Path) -> None:
 
     second_store = MemoryStore(path=path)
 
-    assert second_store.list() == ["gosto de python"]
+    assert memory_contents(second_store.list()) == ["gosto de python"]
 
 
 def test_memory_store_removes_existing_memory(tmp_path: Path) -> None:
@@ -202,7 +206,7 @@ def test_memory_store_removes_existing_memory(tmp_path: Path) -> None:
     removed = store.remove("gosto de python")
 
     assert removed is True
-    assert store.list() == []
+    assert memory_contents(store.list()) == []
 
 
 def test_memory_store_reports_missing_memory_without_changes(tmp_path: Path) -> None:
@@ -212,7 +216,7 @@ def test_memory_store_reports_missing_memory_without_changes(tmp_path: Path) -> 
     removed = store.remove("gosto de dart")
 
     assert removed is False
-    assert store.list() == ["gosto de python"]
+    assert memory_contents(store.list()) == ["gosto de python"]
 
 
 def test_memory_store_ignores_blank_removal_entries(tmp_path: Path) -> None:
@@ -222,7 +226,7 @@ def test_memory_store_ignores_blank_removal_entries(tmp_path: Path) -> None:
     removed = store.remove("   ")
 
     assert removed is False
-    assert store.list() == ["gosto de python"]
+    assert memory_contents(store.list()) == ["gosto de python"]
 
 
 def test_memory_store_persists_removal_between_instances(tmp_path: Path) -> None:
@@ -233,7 +237,7 @@ def test_memory_store_persists_removal_between_instances(tmp_path: Path) -> None
 
     second_store = MemoryStore(path=path)
 
-    assert second_store.list() == []
+    assert memory_contents(second_store.list()) == []
 
 
 def test_memory_store_replaces_existing_memory(tmp_path: Path) -> None:
@@ -243,7 +247,7 @@ def test_memory_store_replaces_existing_memory(tmp_path: Path) -> None:
     result = store.replace("gosto de python", "gosto de dart")
 
     assert result is ReplaceResult.REPLACED
-    assert store.list() == ["gosto de dart"]
+    assert memory_contents(store.list()) == ["gosto de dart"]
 
 
 def test_memory_store_reports_missing_memory_without_changes_on_replace(tmp_path: Path) -> None:
@@ -253,7 +257,7 @@ def test_memory_store_reports_missing_memory_without_changes_on_replace(tmp_path
     result = store.replace("gosto de rust", "gosto de dart")
 
     assert result is ReplaceResult.NOT_FOUND
-    assert store.list() == ["gosto de python"]
+    assert memory_contents(store.list()) == ["gosto de python"]
 
 
 def test_memory_store_reports_invalid_values_on_replace(tmp_path: Path) -> None:
@@ -262,10 +266,10 @@ def test_memory_store_reports_invalid_values_on_replace(tmp_path: Path) -> None:
     store.add("gosto de python")
     assert store.replace("   ", "gosto de dart") is ReplaceResult.INVALID
     assert store.replace("gosto de python", "   ") is ReplaceResult.INVALID
-    assert store.list() == ["gosto de python"]
+    assert memory_contents(store.list()) == ["gosto de python"]
 
 
-def test_memory_store_replaces_and_deduplicates_when_new_value_already_exists(
+def test_memory_store_rejects_replacement_when_new_value_already_exists(
     tmp_path: Path,
 ) -> None:
     store = MemoryStore(path=tmp_path / "memories.json")
@@ -274,8 +278,8 @@ def test_memory_store_replaces_and_deduplicates_when_new_value_already_exists(
     store.add("gosto de dart")
     result = store.replace("gosto de python", "gosto de dart")
 
-    assert result is ReplaceResult.REPLACED
-    assert store.list() == ["gosto de dart"]
+    assert result is ReplaceResult.DUPLICATE
+    assert memory_contents(store.list()) == ["gosto de python", "gosto de dart"]
 
 
 def test_memory_store_reports_unchanged_when_replacement_is_same_value(tmp_path: Path) -> None:
@@ -285,7 +289,7 @@ def test_memory_store_reports_unchanged_when_replacement_is_same_value(tmp_path:
     result = store.replace("gosto de python", "gosto de python")
 
     assert result is ReplaceResult.UNCHANGED
-    assert store.list() == ["gosto de python"]
+    assert memory_contents(store.list()) == ["gosto de python"]
 
 
 def test_memory_store_preserves_position_when_replacing(tmp_path: Path) -> None:
@@ -296,7 +300,7 @@ def test_memory_store_preserves_position_when_replacing(tmp_path: Path) -> None:
     store.add("gosto de rust")
     store.replace("gosto de dart", "gosto de go")
 
-    assert store.list() == ["gosto de python", "gosto de go", "gosto de rust"]
+    assert memory_contents(store.list()) == ["gosto de python", "gosto de go", "gosto de rust"]
 
 
 def test_memory_store_persists_replacement_between_instances(tmp_path: Path) -> None:
@@ -307,7 +311,7 @@ def test_memory_store_persists_replacement_between_instances(tmp_path: Path) -> 
 
     second_store = MemoryStore(path=path)
 
-    assert second_store.list() == ["gosto de dart"]
+    assert memory_contents(second_store.list()) == ["gosto de dart"]
 
 
 def test_memory_store_searches_partial_and_case_insensitive(tmp_path: Path) -> None:
@@ -317,8 +321,8 @@ def test_memory_store_searches_partial_and_case_insensitive(tmp_path: Path) -> N
     store.add("gosto de dart")
     store.add("aprender rust")
 
-    assert store.search("PYTH") == ["gosto de python"]
-    assert store.search("gosto") == ["gosto de python", "gosto de dart"]
+    assert memory_contents(store.search("PYTH")) == ["gosto de python"]
+    assert memory_contents(store.search("gosto")) == ["gosto de python", "gosto de dart"]
 
 
 def test_memory_store_searches_exact_matches_and_accented_text(tmp_path: Path) -> None:
@@ -328,8 +332,8 @@ def test_memory_store_searches_exact_matches_and_accented_text(tmp_path: Path) -
     store.add("gosto de dart")
     store.add("café da manhã")
 
-    assert store.search("gosto de python") == ["gosto de python"]
-    assert store.search("CAFÉ") == ["café da manhã"]
+    assert memory_contents(store.search("gosto de python")) == ["gosto de python"]
+    assert memory_contents(store.search("CAFÉ")) == ["café da manhã"]
 
 
 def test_memory_store_returns_empty_results_without_rewriting_file(tmp_path: Path) -> None:
@@ -458,7 +462,7 @@ def test_conversation_reports_missing_memory_when_edit_fails(tmp_path: Path) -> 
     assert "Nenhuma memória correspondente foi encontrada." in output
 
 
-def test_conversation_persists_edit_when_new_value_already_exists(tmp_path: Path) -> None:
+def test_conversation_rejects_edit_when_new_value_already_exists(tmp_path: Path) -> None:
     path = tmp_path / "memories.json"
     store = MemoryStore(path=path)
     store.add("teste de edição")
@@ -472,9 +476,8 @@ def test_conversation_persists_edit_when_new_value_already_exists(tmp_path: Path
         memory_store=store,
     )
 
-    assert "Memória editada localmente." in output
-    assert json.loads(path.read_text(encoding="utf-8")) == ["novo texto"]
-    assert MemoryStore(path=path).list() == ["novo texto"]
+    assert "Já existe uma memória com esse conteúdo." in output
+    assert memory_contents(MemoryStore(path=path).list()) == ["teste de edição", "novo texto"]
 
 
 def test_conversation_can_search_memories(tmp_path: Path) -> None:
@@ -530,7 +533,7 @@ def test_conversation_reports_guidance_for_empty_search_term(tmp_path: Path) -> 
     assert "Use: buscar memória: <termo>" in output
 
 
-def test_conversation_reports_invalid_edit_result_after_replacing_duplicate_value(
+def test_conversation_reports_duplicate_and_invalid_edit_results(
     tmp_path: Path,
 ) -> None:
     output: list[str] = []
@@ -551,7 +554,7 @@ def test_conversation_reports_invalid_edit_result_after_replacing_duplicate_valu
         memory_store=store,
     )
 
-    assert "Memória editada localmente." in output
+    assert "Já existe uma memória com esse conteúdo." in output
     assert "Informe a memória atual e o novo conteúdo." in output
 
 
@@ -668,10 +671,12 @@ def test_conversation_does_not_include_removed_memory_in_model_context(tmp_path:
 def test_conversation_includes_saved_memories_in_model_context(tmp_path: Path) -> None:
     provider = FakeProvider()
     store = MemoryStore(path=tmp_path / "memories.json")
+    memory = store.add("gosto de python")
+    assert memory is not None
 
     run_conversation_loop(
         provider,
-        input_reader=create_input_reader(["lembrar: gosto de python", "Olá", "sair"]),
+        input_reader=create_input_reader(["Olá", "sair"]),
         output_writer=lambda message: None,
         memory_store=store,
     )
@@ -680,6 +685,9 @@ def test_conversation_includes_saved_memories_in_model_context(tmp_path: Path) -
     assert "Memórias salvas:" in provider.messages[0]
     assert "- gosto de python" in provider.messages[0]
     assert "Você: Olá" in provider.messages[0]
+    assert memory.id not in provider.messages[0]
+    assert memory.source not in provider.messages[0]
+    assert memory.created_at.isoformat() not in provider.messages[0]
 
 
 def test_conversation_does_not_include_provider_error_in_next_context(tmp_path: Path) -> None:

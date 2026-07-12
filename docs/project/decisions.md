@@ -32,7 +32,9 @@ O modelo padrão é `gemma3:12b`, adequado à GPU principal com 16 GB de VRAM. A
 
 ### Memória persistente local explícita — `in_progress`
 
-A primeira forma de memória persistente é um armazenamento local simples em JSON, acessado por comandos explícitos do CLI (`lembrar:` e `memórias`). Ainda não há captura automática, uso das memórias nas respostas do modelo nem metadados avançados.
+A primeira forma de memória persistente continua sendo o armazenamento local em JSON, exclusivamente com objetos contendo identidade estável, conteúdo, origem e datas de criação e alteração em UTC. Listas de strings não são suportadas. Os comandos explícitos do CLI permanecem responsáveis pela captura e controle, e somente o conteúdo é enviado ao modelo por padrão. SQLite é uma evolução provável quando o armazenamento simples deixar de atender, mas não foi adotado neste incremento.
+
+O domínio de memória é separado do adaptador JSON por `MemoryRepository`. `JsonMemoryStore` usa cache lazy por instância para evitar I/O repetido, assumindo um único writer durante a execução do CLI.
 
 ## Decisões substituídas, rejeitadas ou adiadas
 
@@ -52,7 +54,7 @@ A primeira forma de memória persistente é um armazenamento local simples em JS
 ## Decisões abertas
 
 - Evolução do contrato de mensagens quando contexto de sessão for implementado.
-- Persistência inicial da memória: JSON, SQLite ou alternativa simples.
+- Critérios concretos para migrar a persistência de memória de JSON para SQLite.
 - Momento de separar `packages/conversation` e `packages/models`.
 - Formato do manifesto de capabilities.
 - Primeira capability concreta, provavelmente filesystem.

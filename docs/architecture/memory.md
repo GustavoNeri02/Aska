@@ -25,14 +25,19 @@ Esses tipos descrevem a direção arquitetural, não componentes já implementad
 
 ## Estado atual
 
-- Persistência JSON simples já implementada por meio de `MemoryStore`, em arquivo local quando o CLI é iniciado com um caminho explícito.
+- Persistência JSON estruturada já implementada por meio de `JsonMemoryStore`, em arquivo local quando o CLI é iniciado com um caminho explícito.
+- A entidade `Memory` e o contrato `MemoryRepository` ficam separados do adaptador `JsonMemoryStore`; o CLI depende do contrato e escolhe JSON apenas no ponto de composição.
+- Cada instância de `JsonMemoryStore` carrega o arquivo de forma lazy e mantém as memórias em cache durante o processo, evitando leitura e desserialização repetidas em listagens, buscas e construção de contexto.
+- Cada memória possui `id` local estável, `content`, `source`, `created_at` e `updated_at`. A origem implementada neste incremento é `explicit_cli`, e as datas usam UTC em formato ISO 8601.
+- O único formato aceito é uma lista JSON de objetos estruturados; listas de strings não são mais suportadas.
+- JSON inválido não é sobrescrito por operações de escrita; o armazenamento recusa a mutação para evitar perda silenciosa.
 - A captura acontece somente por comando explícito (`lembrar:`) no CLI.
 - A listagem das memórias salvas está disponível no CLI via comando `memórias`.
 - A remoção explícita de uma memória salva está disponível por meio do comando `esquecer:` com correspondência exata.
 - A edição explícita de uma memória salva está disponível por meio do comando `editar memória: <texto atual> -> <novo texto>` com correspondência exata e sem duplicação.
 - A pesquisa textual explícita de memórias salvas está disponível por meio do comando `buscar memória: <termo>` com correspondência parcial e sem distinção de maiúsculas/minúsculas.
 - Em cada interação conversacional, o CLI carrega as memórias persistidas e as inclui no prompt enviado ao modelo, junto com o histórico da sessão, inclusive em novas execuções.
-- Metadados e explicabilidade ainda não foram implementados.
+- O contexto enviado ao modelo contém somente `content`; identidade e metadados permanecem locais por padrão.
 
 ## Transparência e controle
 
@@ -41,6 +46,8 @@ O usuário deve poder listar, pesquisar, editar e excluir memórias, marcá-las 
 ## Limitações atuais
 
 - Todas as memórias salvas são enviadas em todas as requisições ao modelo; não há seleção por relevância.
-- O contexto é serializado como texto livre pelo CLI; não há estrutura intermediária, metadados ou explicabilidade.
-- Não há compactação, orçamento de tokens, metadados ou explicabilidade para as memórias persistidas.
+- O contexto é serializado como texto livre pelo CLI; a estrutura e os metadados persistidos não são expostos ao modelo.
+- Não há compactação, orçamento de tokens, tipos avançados ou explicabilidade além da origem e das datas mínimas.
 - O histórico da sessão continua separado e apenas em memória durante a execução atual.
+- JSON continua sendo o armazenamento atual. SQLite é uma evolução provável quando consultas, volume ou atomicidade justificarem a mudança, mas ainda não foi adotado.
+- O cache assume que a instância do CLI é a responsável pelas alterações durante sua execução; mudanças externas no arquivo não são recarregadas automaticamente.
