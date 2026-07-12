@@ -25,6 +25,20 @@ class FailingProvider:
         raise ModelProviderError("Modelo indisponível")
 
 
+class FailingThenWorkingProvider:
+    def __init__(self, response: str = "Resposta local") -> None:
+        self.response = response
+        self.messages: list[str] = []
+        self._should_fail = True
+
+    def generate(self, message: str) -> str:
+        self.messages.append(message)
+        if self._should_fail:
+            self._should_fail = False
+            raise ModelProviderError("Modelo indisponível")
+        return self.response
+
+
 def create_input_reader(messages: list[str]) -> Callable[[str], str]:
     iterator: Iterator[str] = iter(messages)
 
@@ -58,6 +72,24 @@ def test_conversation_sends_message_to_provider() -> None:
     )
 
     assert provider.messages == ["Olá"]
+    assert "Aska > Resposta local" in output
+
+
+def test_conversation_sends_recent_history_as_context() -> None:
+    output: list[str] = []
+    provider = FakeProvider()
+
+    run_conversation_loop(
+        provider,
+        input_reader=create_input_reader(["Olá", "Me conte mais", "sair"]),
+        output_writer=output.append,
+    )
+
+    assert provider.messages[0] == "Olá"
+    assert "Histórico da sessão" in provider.messages[1]
+    assert "Você: Olá" in provider.messages[1]
+    assert "Aska: Resposta local" in provider.messages[1]
+    assert "Você: Me conte mais" in provider.messages[1]
     assert "Aska > Resposta local" in output
 
 
@@ -112,3 +144,18 @@ def test_conversation_reports_provider_error_and_keeps_running() -> None:
 
     assert "Aska > Modelo indisponível" in output
     assert "Até mais, Gustavo." in output
+
+
+def test_conversation_does_not_include_provider_error_in_next_context() -> None:
+    output: list[str] = []
+    provider = FailingThenWorkingProvider()
+
+    run_conversation_loop(
+        provider,
+        input_reader=create_input_reader(["Olá", "Como vai", "sair"]),
+        output_writer=output.append,
+    )
+
+    assert provider.messages == ["Olá", "Como vai"]
+    assert "Aska > Modelo indisponível" in output
+    assert "Aska > Resposta local" in output

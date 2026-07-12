@@ -21,6 +21,20 @@ def build_banner() -> str:
     )
 
 
+def _build_context_message(history: list[tuple[str, str]], message: str) -> str:
+    if not history:
+        return message
+
+    lines = ["Histórico da sessão:"]
+    for user_message, assistant_message in history:
+        lines.append(f"Você: {user_message}")
+        lines.append(f"Aska: {assistant_message}")
+
+    lines.append("")
+    lines.append(f"Você: {message}")
+    return "\n".join(lines)
+
+
 def run_conversation_loop(
     provider: ModelProvider,
     input_reader: Callable[[str], str] = input,
@@ -32,6 +46,8 @@ def run_conversation_loop(
     output_writer("")
     output_writer("Digite 'sair' para encerrar.")
     output_writer("")
+
+    session_history: list[tuple[str, str]] = []
 
     while True:
         try:
@@ -47,12 +63,15 @@ def run_conversation_loop(
             output_writer("Até mais, Gustavo.")
             return
 
+        context_message = _build_context_message(session_history, message)
+
         try:
-            response = provider.generate(message)
+            response = provider.generate(context_message)
         except ModelProviderError as error:
             output_writer(f"Aska > {error}")
             continue
 
+        session_history.append((message, response))
         output_writer(f"Aska > {response}")
 
 

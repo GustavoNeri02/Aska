@@ -34,7 +34,7 @@ Iniciar o contexto da sessão mantendo o histórico apenas em memória, sem ante
 | --- | --- | --- | --- |
 | 0 | Foundation | Setup, monorepo, documentação e qualidade | `implemented` |
 | 1 | CLI and local conversation | CLI e primeira conversa com modelo local substituível | `implemented` |
-| 2 | Session context | Histórico e contexto útil na sessão | `planned` |
+| 2 | Session context | Histórico e contexto útil na sessão | `implemented` |
 | 3 | Persistent memory | Memória local transparente e consultável | `planned` |
 | 4 | Tools and capabilities | Registro seguro e primeira capability | `planned` |
 | 5 | Knowledge and retrieval | Indexação de documentos, código e informações | `planned` |

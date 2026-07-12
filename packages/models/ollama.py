@@ -47,11 +47,11 @@ class OllamaProvider:
             raise ModelProviderError("Ollama retornou uma resposta inválida.") from error
 
         if not isinstance(result, dict):
-            raise ModelProviderError("Ollama retornou uma resposta inválida.")
+            raise ModelProviderError(f"Resposta inválida: {result}")
 
         response_message = result.get("message")
         if not isinstance(response_message, dict):
-            raise ModelProviderError("Ollama retornou uma resposta inválida.")
+            raise ModelProviderError("resposta inválida")
 
         content = response_message.get("content")
         if not isinstance(content, str) or not content.strip():
@@ -62,9 +62,9 @@ class OllamaProvider:
     @staticmethod
     def _read_error_detail(error: HTTPError) -> str:
         try:
-            result = json.loads(error.read().decode("utf-8"))
+            response = error.read().decode("utf-8")
+            result = json.loads(response)
+            detail = result.get("error", response)
+            return detail if isinstance(detail, str) else response
         except (json.JSONDecodeError, UnicodeDecodeError):
             return error.reason
-
-        detail = result.get("error")
-        return detail if isinstance(detail, str) else error.reason
