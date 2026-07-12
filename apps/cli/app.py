@@ -51,9 +51,9 @@ def _build_context_message(
 
 def run_conversation_loop(
     provider: ModelProvider,
+    memory_store: MemoryStore,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
-    memory_store: MemoryStore | None = None,
 ) -> None:
     output_writer(build_banner())
     output_writer("")
@@ -63,7 +63,6 @@ def run_conversation_loop(
     output_writer("")
 
     session_history: list[tuple[str, str]] = []
-    store = memory_store if memory_store is not None else MemoryStore()
 
     while True:
         try:
@@ -80,7 +79,7 @@ def run_conversation_loop(
             return
 
         if message.casefold() == "memórias":
-            memories = store.list()
+            memories = memory_store.list()
             output_writer("Memórias locais:")
             if memories:
                 for memory in memories:
@@ -92,11 +91,11 @@ def run_conversation_loop(
         if message.casefold().startswith("lembrar:"):
             memory = message.split(":", 1)[1].strip()
             if memory:
-                store.add(memory)
+                memory_store.add(memory)
                 output_writer("Memória registrada localmente.")
             continue
 
-        context_message = _build_context_message(session_history, message, store.list())
+        context_message = _build_context_message(session_history, message, memory_store.list())
 
         try:
             response = provider.generate(context_message)

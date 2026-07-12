@@ -28,7 +28,7 @@ Esses tipos descrevem a direção arquitetural, não componentes já implementad
 - Persistência JSON simples já implementada por meio de `MemoryStore`, em arquivo local quando o CLI é iniciado com um caminho explícito.
 - A captura acontece somente por comando explícito (`lembrar:`) no CLI.
 - A listagem das memórias salvas está disponível no CLI via comando `memórias`.
-- As memórias salvas são incluídas no prompt enviado ao modelo na próxima interação, junto com o histórico da sessão.
+- Em cada interação conversacional, o CLI carrega as memórias persistidas e as inclui no prompt enviado ao modelo, junto com o histórico da sessão, inclusive em novas execuções.
 - Edição, exclusão, pesquisa, metadados e explicabilidade ainda não foram implementados.
 
 ## Transparência e controle

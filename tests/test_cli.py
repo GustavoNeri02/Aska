@@ -11,6 +11,10 @@ from packages.models import ModelProviderError
 from packages.runtime.memory import MemoryStore
 
 
+def create_memory_store(tmp_path: Path) -> MemoryStore:
+    return MemoryStore(path=tmp_path / "memories.json")
+
+
 class FakeProvider:
     def __init__(self, response: str = "Resposta local") -> None:
         self.response = response
@@ -63,7 +67,7 @@ def test_build_banner_contains_application_name() -> None:
     assert "Aska" in banner
 
 
-def test_conversation_sends_message_to_provider() -> None:
+def test_conversation_sends_message_to_provider(tmp_path: Path) -> None:
     output: list[str] = []
     provider = FakeProvider()
 
@@ -71,13 +75,14 @@ def test_conversation_sends_message_to_provider() -> None:
         provider,
         input_reader=create_input_reader(["Olá", "sair"]),
         output_writer=output.append,
+        memory_store=create_memory_store(tmp_path),
     )
 
     assert provider.messages == ["Olá"]
     assert "Aska > Resposta local" in output
 
 
-def test_conversation_sends_recent_history_as_context() -> None:
+def test_conversation_sends_recent_history_as_context(tmp_path: Path) -> None:
     output: list[str] = []
     provider = FakeProvider()
 
@@ -85,6 +90,7 @@ def test_conversation_sends_recent_history_as_context() -> None:
         provider,
         input_reader=create_input_reader(["Olá", "Me conte mais", "sair"]),
         output_writer=output.append,
+        memory_store=create_memory_store(tmp_path),
     )
 
     assert provider.messages[0] == "Olá"
@@ -96,25 +102,27 @@ def test_conversation_sends_recent_history_as_context() -> None:
 
 
 @pytest.mark.parametrize("command", ["sair", "exit", "quit", " SAIR "])
-def test_conversation_stops_when_user_types_exit_command(command: str) -> None:
+def test_conversation_stops_when_user_types_exit_command(command: str, tmp_path: Path) -> None:
     output: list[str] = []
 
     run_conversation_loop(
         FakeProvider(),
         input_reader=create_input_reader([command]),
         output_writer=output.append,
+        memory_store=create_memory_store(tmp_path),
     )
 
     assert "Até mais, Gustavo." in output
 
 
-def test_conversation_ignores_blank_messages() -> None:
+def test_conversation_ignores_blank_messages(tmp_path: Path) -> None:
     output: list[str] = []
 
     run_conversation_loop(
         FakeProvider(),
         input_reader=create_input_reader(["", "   ", "Olá", "sair"]),
         output_writer=output.append,
+        memory_store=create_memory_store(tmp_path),
     )
 
     responses = [line for line in output if line.startswith("Aska >")]
@@ -123,25 +131,27 @@ def test_conversation_ignores_blank_messages() -> None:
 
 
 @pytest.mark.parametrize("error", [EOFError(), KeyboardInterrupt()])
-def test_conversation_handles_interruption(error: BaseException) -> None:
+def test_conversation_handles_interruption(error: BaseException, tmp_path: Path) -> None:
     output: list[str] = []
 
     run_conversation_loop(
         FakeProvider(),
         input_reader=create_interrupting_reader(error),
         output_writer=output.append,
+        memory_store=create_memory_store(tmp_path),
     )
 
     assert "\nEncerrando o Aska." in output
 
 
-def test_conversation_reports_provider_error_and_keeps_running() -> None:
+def test_conversation_reports_provider_error_and_keeps_running(tmp_path: Path) -> None:
     output: list[str] = []
 
     run_conversation_loop(
         FailingProvider(),
         input_reader=create_input_reader(["Olá", "sair"]),
         output_writer=output.append,
+        memory_store=create_memory_store(tmp_path),
     )
 
     assert "Aska > Modelo indisponível" in output
@@ -200,7 +210,7 @@ def test_conversation_handles_invalid_json_without_broken_flow(tmp_path: Path) -
     assert "(nenhuma memória registrada)" in output
 
 
-def test_run_conversation_loop_does_not_create_real_memory_file_without_injection(
+def test_run_conversation_loop_uses_injected_store_without_touching_real_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -211,6 +221,7 @@ def test_run_conversation_loop_does_not_create_real_memory_file_without_injectio
         FakeProvider(),
         input_reader=create_input_reader(["lembrar: gosto de python", "sair"]),
         output_writer=output.append,
+        memory_store=create_memory_store(tmp_path),
     )
 
     assert not (tmp_path / "data" / "memory" / "memories.json").exists()
@@ -248,7 +259,7 @@ def test_conversation_includes_saved_memories_in_model_context(tmp_path: Path) -
     assert "Você: Olá" in provider.messages[0]
 
 
-def test_conversation_does_not_include_provider_error_in_next_context() -> None:
+def test_conversation_does_not_include_provider_error_in_next_context(tmp_path: Path) -> None:
     output: list[str] = []
     provider = FailingThenWorkingProvider()
 
@@ -256,6 +267,7 @@ def test_conversation_does_not_include_provider_error_in_next_context() -> None:
         provider,
         input_reader=create_input_reader(["Olá", "Como vai", "sair"]),
         output_writer=output.append,
+        memory_store=create_memory_store(tmp_path),
     )
 
     assert provider.messages == ["Olá", "Como vai"]

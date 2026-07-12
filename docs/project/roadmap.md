@@ -2,13 +2,13 @@
 
 ## Estado atual
 
-**Fase:** 1 — CLI and local conversation
+**Fase atual:** evolução do CLI com Session Context implementado e Persistent Memory em progresso.
 
 **Última Sprint concluída:** Sprint 1 — primeiro CLI do Aska
 
 **Status da Sprint 1:** `implemented`
 
-### Implementado
+### Implementado na Sprint 1
 
 - Repositório, monorepo e configuração inicial com Python, uv, Ruff e Pytest.
 - Entry point `uv run aska`.
@@ -16,17 +16,25 @@
 - Leitura de mensagens em loop.
 - Entrada vazia ignorada.
 - Encerramento com `sair`, `exit`, `quit`, EOF ou `Ctrl+C`.
-- Resposta placeholder informando que não há modelo conectado.
 - Testes do comportamento principal do CLI.
 - README e documentação modular inicial.
 - Encerramento e entradas de borda cobertos por testes automatizados.
+
+### Evolução posterior à Sprint 1
+
 - Contrato mínimo de provider e adaptador HTTP para Ollama.
 - Provider injetado no CLI com tratamento de indisponibilidade.
 - Ollama e Gemma 3 12B validados com uma resposta local ponta a ponta.
 
+### Comportamento atual
+
+- Session Context está implementado e usa histórico em memória durante a conversa atual.
+- Persistent Memory está `in_progress` e já suporta persistência JSON simples, registro explícito por `lembrar:` e listagem por `memórias`.
+- O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.
+
 ### Incremento atual de memória explícita
 
-O primeiro incremento de Persistent Memory já implementa persistência JSON simples, registro explícito por `lembrar:`, listagem por `memórias` e inclusão das memórias salvas no contexto enviado ao modelo para a próxima interação.
+O primeiro incremento de Persistent Memory já implementa persistência JSON simples, registro explícito por `lembrar:`, listagem por `memórias` e carregamento das memórias persistidas em cada interação conversacional, inclusive após novas execuções.
 
 ### Limitações atuais do incremento
 
