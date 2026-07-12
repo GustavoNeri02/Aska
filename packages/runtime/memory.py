@@ -56,7 +56,7 @@ class MemoryStore:
             return ReplaceResult.UNCHANGED
 
         if new_value in memories:
-            return ReplaceResult.DUPLICATE
+            memories.remove(new_value)
 
         index = memories.index(current_value)
         memories[index] = new_value

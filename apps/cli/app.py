@@ -1,16 +1,9 @@
 import os
 from collections.abc import Callable
 
+from apps.cli.commands import ExitCommand, MemoryCommand
 from packages.models import ModelProvider, ModelProviderError, OllamaProvider
 from packages.runtime.memory import MemoryStore, ReplaceResult
-
-EXIT_COMMANDS = frozenset(
-    {
-        "sair",
-        "exit",
-        "quit",
-    }
-)
 
 
 def build_banner() -> str:
@@ -74,11 +67,11 @@ def run_conversation_loop(
         if not message:
             continue
 
-        if message.casefold() in EXIT_COMMANDS:
+        if message.casefold() in ExitCommand:
             output_writer("Até mais, Gustavo.")
             return
 
-        if message.casefold() == "memórias":
+        if message.casefold() == MemoryCommand.MEMORIES:
             memories = memory_store.list()
             output_writer("Memórias locais:")
             if memories:
@@ -88,14 +81,14 @@ def run_conversation_loop(
                 output_writer("(nenhuma memória registrada)")
             continue
 
-        if message.casefold().startswith("lembrar:"):
+        if message.casefold().startswith(f"{MemoryCommand.REMEMBER}:"):
             memory = message.split(":", 1)[1].strip()
             if memory:
                 memory_store.add(memory)
                 output_writer("Memória registrada localmente.")
             continue
 
-        if message.casefold().startswith("esquecer:"):
+        if message.casefold().startswith(f"{MemoryCommand.FORGET}:"):
             memory = message.split(":", 1)[1].strip()
             if memory:
                 removed = memory_store.remove(memory)
@@ -105,7 +98,7 @@ def run_conversation_loop(
                     output_writer("Nenhuma memória correspondente foi encontrada.")
             continue
 
-        if message.casefold().startswith("editar memória:"):
+        if message.casefold().startswith(f"{MemoryCommand.EDIT}:"):
             command = message.split(":", 1)[1].strip()
             if "->" not in command:
                 output_writer("Use: editar memória: <atual> -> <novo>")
@@ -125,7 +118,7 @@ def run_conversation_loop(
                 output_writer("A memória já possui esse conteúdo.")
             continue
 
-        if message.casefold().startswith("buscar memória:"):
+        if message.casefold().startswith(f"{MemoryCommand.SEARCH}:"):
             term = message.split(":", 1)[1].strip()
             if not term:
                 output_writer("Use: buscar memória: <termo>")

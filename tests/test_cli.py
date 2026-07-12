@@ -1,3 +1,4 @@
+import json
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -264,15 +265,17 @@ def test_memory_store_reports_invalid_values_on_replace(tmp_path: Path) -> None:
     assert store.list() == ["gosto de python"]
 
 
-def test_memory_store_reports_duplicate_on_replace(tmp_path: Path) -> None:
+def test_memory_store_replaces_and_deduplicates_when_new_value_already_exists(
+    tmp_path: Path,
+) -> None:
     store = MemoryStore(path=tmp_path / "memories.json")
 
     store.add("gosto de python")
     store.add("gosto de dart")
     result = store.replace("gosto de python", "gosto de dart")
 
-    assert result is ReplaceResult.DUPLICATE
-    assert store.list() == ["gosto de python", "gosto de dart"]
+    assert result is ReplaceResult.REPLACED
+    assert store.list() == ["gosto de dart"]
 
 
 def test_memory_store_reports_unchanged_when_replacement_is_same_value(tmp_path: Path) -> None:
@@ -455,6 +458,25 @@ def test_conversation_reports_missing_memory_when_edit_fails(tmp_path: Path) -> 
     assert "Nenhuma memória correspondente foi encontrada." in output
 
 
+def test_conversation_persists_edit_when_new_value_already_exists(tmp_path: Path) -> None:
+    path = tmp_path / "memories.json"
+    store = MemoryStore(path=path)
+    store.add("teste de edição")
+    store.add("novo texto")
+    output: list[str] = []
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["editar memória: teste de edição -> novo texto", "sair"]),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "Memória editada localmente." in output
+    assert json.loads(path.read_text(encoding="utf-8")) == ["novo texto"]
+    assert MemoryStore(path=path).list() == ["novo texto"]
+
+
 def test_conversation_can_search_memories(tmp_path: Path) -> None:
     output: list[str] = []
     store = MemoryStore(path=tmp_path / "memories.json")
@@ -508,7 +530,9 @@ def test_conversation_reports_guidance_for_empty_search_term(tmp_path: Path) -> 
     assert "Use: buscar memória: <termo>" in output
 
 
-def test_conversation_reports_duplicate_and_invalid_edit_results(tmp_path: Path) -> None:
+def test_conversation_reports_invalid_edit_result_after_replacing_duplicate_value(
+    tmp_path: Path,
+) -> None:
     output: list[str] = []
     store = MemoryStore(path=tmp_path / "memories.json")
 
@@ -527,7 +551,7 @@ def test_conversation_reports_duplicate_and_invalid_edit_results(tmp_path: Path)
         memory_store=store,
     )
 
-    assert "Já existe uma memória com esse conteúdo." in output
+    assert "Memória editada localmente." in output
     assert "Informe a memória atual e o novo conteúdo." in output
 
 
