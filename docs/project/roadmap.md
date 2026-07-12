@@ -29,7 +29,7 @@
 ### Comportamento atual
 
 - Session Context está implementado e usa histórico em memória durante a conversa atual.
-- Persistent Memory está `in_progress` e já suporta persistência JSON simples, registro explícito por `lembrar:` e listagem por `memórias`.
+- Persistent Memory está `in_progress` e já suporta persistência JSON simples, registro explícito por `lembrar:`, remoção explícita por `esquecer:` e listagem por `memórias`.
 - O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.
 
 ### Incremento atual de memória explícita
@@ -41,7 +41,7 @@ O primeiro incremento de Persistent Memory já implementa persistência JSON sim
 - Todas as memórias salvas são enviadas em todas as requisições ao modelo.
 - Não há seleção por relevância, compactação ou orçamento de tokens.
 - Memórias ainda são texto livre serializado pelo CLI.
-- Edição, exclusão, metadados e explicabilidade continuam pendentes.
+- Edição, metadados e explicabilidade continuam pendentes.
 
 ## Roadmap
 

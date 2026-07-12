@@ -194,6 +194,47 @@ def test_memory_store_persists_between_instances(tmp_path: Path) -> None:
     assert second_store.list() == ["gosto de python"]
 
 
+def test_memory_store_removes_existing_memory(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    removed = store.remove("gosto de python")
+
+    assert removed is True
+    assert store.list() == []
+
+
+def test_memory_store_reports_missing_memory_without_changes(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    removed = store.remove("gosto de dart")
+
+    assert removed is False
+    assert store.list() == ["gosto de python"]
+
+
+def test_memory_store_ignores_blank_removal_entries(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    removed = store.remove("   ")
+
+    assert removed is False
+    assert store.list() == ["gosto de python"]
+
+
+def test_memory_store_persists_removal_between_instances(tmp_path: Path) -> None:
+    path = tmp_path / "memories.json"
+    first_store = MemoryStore(path=path)
+    first_store.add("gosto de python")
+    first_store.remove("gosto de python")
+
+    second_store = MemoryStore(path=path)
+
+    assert second_store.list() == []
+
+
 def test_conversation_handles_invalid_json_without_broken_flow(tmp_path: Path) -> None:
     output: list[str] = []
     path = tmp_path / "memories.json"
@@ -240,6 +281,56 @@ def test_conversation_can_store_and_list_memories(tmp_path: Path) -> None:
 
     assert "Memória registrada localmente." in output
     assert "gosto de python" in output
+
+
+def test_conversation_can_remove_memories_and_list_current_state(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(
+            ["lembrar: gosto de python", "esquecer: gosto de python", "memórias", "sair"]
+        ),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "Memória removida localmente." in output
+    assert "(nenhuma memória registrada)" in output
+
+
+def test_conversation_reports_missing_memory_when_removal_fails(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["esquecer: gosto de rust", "sair"]),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "Nenhuma memória correspondente foi encontrada." in output
+
+
+def test_conversation_does_not_include_removed_memory_in_model_context(tmp_path: Path) -> None:
+    provider = FakeProvider()
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        provider,
+        input_reader=create_input_reader(
+            ["lembrar: gosto de python", "esquecer: gosto de python", "Olá", "sair"]
+        ),
+        output_writer=lambda message: None,
+        memory_store=store,
+    )
+
+    assert len(provider.messages) == 1
+    assert "Memórias salvas:" not in provider.messages[0]
+    assert "gosto de python" not in provider.messages[0]
+    assert provider.messages[0] == "Olá"
 
 
 def test_conversation_includes_saved_memories_in_model_context(tmp_path: Path) -> None:

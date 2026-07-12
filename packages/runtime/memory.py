@@ -20,6 +20,19 @@ class MemoryStore:
             memories.append(normalized_memory)
             self._write(memories)
 
+    def remove(self, memory: str) -> bool:
+        normalized_memory = memory.strip()
+        if not normalized_memory or self._path is None:
+            return False
+
+        memories = self.list()
+        if normalized_memory not in memories:
+            return False
+
+        memories.remove(normalized_memory)
+        self._write(memories)
+        return True
+
     def list(self) -> list[str]:
         if self._path is None:
             return []

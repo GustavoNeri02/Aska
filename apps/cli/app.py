@@ -95,6 +95,16 @@ def run_conversation_loop(
                 output_writer("Memória registrada localmente.")
             continue
 
+        if message.casefold().startswith("esquecer:"):
+            memory = message.split(":", 1)[1].strip()
+            if memory:
+                removed = memory_store.remove(memory)
+                if removed:
+                    output_writer("Memória removida localmente.")
+                else:
+                    output_writer("Nenhuma memória correspondente foi encontrada.")
+            continue
+
         context_message = _build_context_message(session_history, message, memory_store.list())
 
         try:
