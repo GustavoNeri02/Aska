@@ -2,7 +2,7 @@ import os
 from collections.abc import Callable
 
 from packages.models import ModelProvider, ModelProviderError, OllamaProvider
-from packages.runtime.memory import MemoryStore
+from packages.runtime.memory import MemoryStore, ReplaceResult
 
 EXIT_COMMANDS = frozenset(
     {
@@ -103,6 +103,26 @@ def run_conversation_loop(
                     output_writer("Memória removida localmente.")
                 else:
                     output_writer("Nenhuma memória correspondente foi encontrada.")
+            continue
+
+        if message.casefold().startswith("editar memória:"):
+            command = message.split(":", 1)[1].strip()
+            if "->" not in command:
+                output_writer("Use: editar memória: <atual> -> <novo>")
+                continue
+
+            current_memory, new_memory = (part.strip() for part in command.split("->", 1))
+            result = memory_store.replace(current_memory, new_memory)
+            if result is ReplaceResult.REPLACED:
+                output_writer("Memória editada localmente.")
+            elif result is ReplaceResult.NOT_FOUND:
+                output_writer("Nenhuma memória correspondente foi encontrada.")
+            elif result is ReplaceResult.DUPLICATE:
+                output_writer("Já existe uma memória com esse conteúdo.")
+            elif result is ReplaceResult.INVALID:
+                output_writer("Informe a memória atual e o novo conteúdo.")
+            elif result is ReplaceResult.UNCHANGED:
+                output_writer("A memória já possui esse conteúdo.")
             continue
 
         context_message = _build_context_message(session_history, message, memory_store.list())

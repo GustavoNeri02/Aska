@@ -8,7 +8,7 @@ from apps.cli.app import (
     run_conversation_loop,
 )
 from packages.models import ModelProviderError
-from packages.runtime.memory import MemoryStore
+from packages.runtime.memory import MemoryStore, ReplaceResult
 
 
 def create_memory_store(tmp_path: Path) -> MemoryStore:
@@ -235,6 +235,78 @@ def test_memory_store_persists_removal_between_instances(tmp_path: Path) -> None
     assert second_store.list() == []
 
 
+def test_memory_store_replaces_existing_memory(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    result = store.replace("gosto de python", "gosto de dart")
+
+    assert result is ReplaceResult.REPLACED
+    assert store.list() == ["gosto de dart"]
+
+
+def test_memory_store_reports_missing_memory_without_changes_on_replace(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    result = store.replace("gosto de rust", "gosto de dart")
+
+    assert result is ReplaceResult.NOT_FOUND
+    assert store.list() == ["gosto de python"]
+
+
+def test_memory_store_reports_invalid_values_on_replace(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    assert store.replace("   ", "gosto de dart") is ReplaceResult.INVALID
+    assert store.replace("gosto de python", "   ") is ReplaceResult.INVALID
+    assert store.list() == ["gosto de python"]
+
+
+def test_memory_store_reports_duplicate_on_replace(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    store.add("gosto de dart")
+    result = store.replace("gosto de python", "gosto de dart")
+
+    assert result is ReplaceResult.DUPLICATE
+    assert store.list() == ["gosto de python", "gosto de dart"]
+
+
+def test_memory_store_reports_unchanged_when_replacement_is_same_value(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    result = store.replace("gosto de python", "gosto de python")
+
+    assert result is ReplaceResult.UNCHANGED
+    assert store.list() == ["gosto de python"]
+
+
+def test_memory_store_preserves_position_when_replacing(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    store.add("gosto de dart")
+    store.add("gosto de rust")
+    store.replace("gosto de dart", "gosto de go")
+
+    assert store.list() == ["gosto de python", "gosto de go", "gosto de rust"]
+
+
+def test_memory_store_persists_replacement_between_instances(tmp_path: Path) -> None:
+    path = tmp_path / "memories.json"
+    first_store = MemoryStore(path=path)
+    first_store.add("gosto de python")
+    first_store.replace("gosto de python", "gosto de dart")
+
+    second_store = MemoryStore(path=path)
+
+    assert second_store.list() == ["gosto de dart"]
+
+
 def test_conversation_handles_invalid_json_without_broken_flow(tmp_path: Path) -> None:
     output: list[str] = []
     path = tmp_path / "memories.json"
@@ -298,6 +370,145 @@ def test_conversation_can_remove_memories_and_list_current_state(tmp_path: Path)
 
     assert "Memória removida localmente." in output
     assert "(nenhuma memória registrada)" in output
+
+
+def test_conversation_can_edit_memories_and_list_current_state(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(
+            [
+                "lembrar: gosto de python",
+                "editar memória: gosto de python -> gosto de dart",
+                "memórias",
+                "sair",
+            ]
+        ),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "Memória editada localmente." in output
+    assert "gosto de dart" in output
+    assert "gosto de python" not in output
+
+
+def test_conversation_reports_missing_memory_when_edit_fails(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(
+            ["editar memória: gosto de rust -> gosto de dart", "sair"]
+        ),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "Nenhuma memória correspondente foi encontrada." in output
+
+
+def test_conversation_reports_duplicate_and_invalid_edit_results(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(
+            [
+                "lembrar: gosto de python",
+                "lembrar: gosto de dart",
+                "editar memória: gosto de python -> gosto de dart",
+                "editar memória: gosto de python ->  ",
+                "sair",
+            ]
+        ),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "Já existe uma memória com esse conteúdo." in output
+    assert "Informe a memória atual e o novo conteúdo." in output
+
+
+def test_conversation_reports_unchanged_edit_result(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(
+            [
+                "lembrar: gosto de python",
+                "editar memória: gosto de python -> gosto de python",
+                "sair",
+            ]
+        ),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "A memória já possui esse conteúdo." in output
+
+
+def test_conversation_reports_short_guidance_for_malformed_edit_command(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["editar memória: gosto de python", "sair"]),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "Use: editar memória: <atual> -> <novo>" in output
+
+
+def test_conversation_updates_provider_context_after_edit(tmp_path: Path) -> None:
+    provider = FakeProvider()
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        provider,
+        input_reader=create_input_reader(
+            [
+                "lembrar: gosto de python",
+                "editar memória: gosto de python -> gosto de dart",
+                "Olá",
+                "sair",
+            ]
+        ),
+        output_writer=lambda message: None,
+        memory_store=store,
+    )
+
+    assert len(provider.messages) == 1
+    assert "Memórias salvas:" in provider.messages[0]
+    assert "- gosto de dart" in provider.messages[0]
+    assert "gosto de python" not in provider.messages[0]
+
+
+def test_run_conversation_loop_edit_uses_injected_store_without_touching_real_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output: list[str] = []
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(
+            ["lembrar: gosto de python", "editar memória: gosto de python -> gosto de dart", "sair"]
+        ),
+        output_writer=output.append,
+        memory_store=create_memory_store(tmp_path),
+    )
+
+    assert not (tmp_path / "data" / "memory" / "memories.json").exists()
 
 
 def test_conversation_reports_missing_memory_when_removal_fails(tmp_path: Path) -> None:

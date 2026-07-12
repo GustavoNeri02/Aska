@@ -1,5 +1,14 @@
 import json
+from enum import StrEnum
 from pathlib import Path
+
+
+class ReplaceResult(StrEnum):
+    REPLACED = "replaced"
+    NOT_FOUND = "not_found"
+    DUPLICATE = "duplicate"
+    INVALID = "invalid"
+    UNCHANGED = "unchanged"
 
 
 class MemoryStore:
@@ -32,6 +41,27 @@ class MemoryStore:
         memories.remove(normalized_memory)
         self._write(memories)
         return True
+
+    def replace(self, current_memory: str, new_memory: str) -> ReplaceResult:
+        current_value = current_memory.strip()
+        new_value = new_memory.strip()
+        if not current_value or not new_value or self._path is None:
+            return ReplaceResult.INVALID
+
+        memories = self.list()
+        if current_value not in memories:
+            return ReplaceResult.NOT_FOUND
+
+        if new_value == current_value:
+            return ReplaceResult.UNCHANGED
+
+        if new_value in memories:
+            return ReplaceResult.DUPLICATE
+
+        index = memories.index(current_value)
+        memories[index] = new_value
+        self._write(memories)
+        return ReplaceResult.REPLACED
 
     def list(self) -> list[str]:
         if self._path is None:
