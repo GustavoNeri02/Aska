@@ -1,4 +1,5 @@
 import json
+from email.message import Message
 from io import BytesIO
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
@@ -48,7 +49,7 @@ def test_ollama_provider_reports_api_error() -> None:
         url="http://localhost:11434/api/chat",
         code=404,
         msg="Not Found",
-        hdrs=None,
+        hdrs=Message(),
         fp=BytesIO(b'{"error":"model not found"}'),
     )
 
