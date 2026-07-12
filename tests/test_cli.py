@@ -307,6 +307,48 @@ def test_memory_store_persists_replacement_between_instances(tmp_path: Path) -> 
     assert second_store.list() == ["gosto de dart"]
 
 
+def test_memory_store_searches_partial_and_case_insensitive(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    store.add("gosto de dart")
+    store.add("aprender rust")
+
+    assert store.search("PYTH") == ["gosto de python"]
+    assert store.search("gosto") == ["gosto de python", "gosto de dart"]
+
+
+def test_memory_store_searches_exact_matches_and_accented_text(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    store.add("gosto de dart")
+    store.add("café da manhã")
+
+    assert store.search("gosto de python") == ["gosto de python"]
+    assert store.search("CAFÉ") == ["café da manhã"]
+
+
+def test_memory_store_returns_empty_results_without_rewriting_file(tmp_path: Path) -> None:
+    path = tmp_path / "memories.json"
+    store = MemoryStore(path=path)
+
+    store.add("gosto de python")
+    before = path.read_text(encoding="utf-8")
+    results = store.search("rust")
+
+    assert results == []
+    assert path.read_text(encoding="utf-8") == before
+
+
+def test_memory_store_ignores_blank_search_terms(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+
+    assert store.search("   ") == []
+
+
 def test_conversation_handles_invalid_json_without_broken_flow(tmp_path: Path) -> None:
     output: list[str] = []
     path = tmp_path / "memories.json"
@@ -340,19 +382,21 @@ def test_run_conversation_loop_uses_injected_store_without_touching_real_file(
     assert not (tmp_path / "data" / "memory" / "memories.json").exists()
 
 
-def test_conversation_can_store_and_list_memories(tmp_path: Path) -> None:
+def test_conversation_can_store_and_report_search_no_results(tmp_path: Path) -> None:
     output: list[str] = []
     store = MemoryStore(path=tmp_path / "memories.json")
 
     run_conversation_loop(
         FakeProvider(),
-        input_reader=create_input_reader(["lembrar: gosto de python", "memórias", "sair"]),
+        input_reader=create_input_reader(
+            ["lembrar: gosto de python", "buscar memória: rust", "sair"]
+        ),
         output_writer=output.append,
         memory_store=store,
     )
 
     assert "Memória registrada localmente." in output
-    assert "gosto de python" in output
+    assert "Nenhuma memória encontrada para o termo." in output
 
 
 def test_conversation_can_remove_memories_and_list_current_state(tmp_path: Path) -> None:
@@ -409,6 +453,59 @@ def test_conversation_reports_missing_memory_when_edit_fails(tmp_path: Path) -> 
     )
 
     assert "Nenhuma memória correspondente foi encontrada." in output
+
+
+def test_conversation_can_search_memories(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(
+            [
+                "lembrar: gosto de python",
+                "lembrar: gosto de dart",
+                "buscar memória: gosto",
+                "sair",
+            ]
+        ),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "Resultados da busca:" in output
+    assert "gosto de python" in output
+    assert "gosto de dart" in output
+
+
+def test_conversation_reports_missing_search_results(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(
+            ["lembrar: gosto de python", "buscar memória: rust", "sair"]
+        ),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "Nenhuma memória encontrada para o termo." in output
+
+
+def test_conversation_reports_guidance_for_empty_search_term(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["buscar memória:   ", "sair"]),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "Use: buscar memória: <termo>" in output
 
 
 def test_conversation_reports_duplicate_and_invalid_edit_results(tmp_path: Path) -> None:

@@ -63,6 +63,14 @@ class MemoryStore:
         self._write(memories)
         return ReplaceResult.REPLACED
 
+    def search(self, term: str) -> list[str]:
+        normalized_term = term.strip().casefold()
+        if not normalized_term or self._path is None:
+            return []
+
+        memories = self.list()
+        return [memory for memory in memories if normalized_term in memory.casefold()]
+
     def list(self) -> list[str]:
         if self._path is None:
             return []

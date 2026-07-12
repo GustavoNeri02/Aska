@@ -29,12 +29,12 @@
 ### Comportamento atual
 
 - Session Context está implementado e usa histórico em memória durante a conversa atual.
-- Persistent Memory está `in_progress` e já suporta persistência JSON simples, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:` e listagem por `memórias`.
+- Persistent Memory está `in_progress` e já suporta persistência JSON simples, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
 - O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.
 
 ### Incremento atual de memória explícita
 
-O primeiro incremento de Persistent Memory já implementa persistência JSON simples, registro explícito por `lembrar:`, listagem por `memórias` e carregamento das memórias persistidas em cada interação conversacional, inclusive após novas execuções.
+O primeiro incremento de Persistent Memory já implementa persistência JSON simples, registro explícito por `lembrar:`, listagem por `memórias`, pesquisa textual por `buscar memória:` e carregamento das memórias persistidas em cada interação conversacional, inclusive após novas execuções.
 
 ### Limitações atuais do incremento
 

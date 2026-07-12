@@ -125,6 +125,21 @@ def run_conversation_loop(
                 output_writer("A memória já possui esse conteúdo.")
             continue
 
+        if message.casefold().startswith("buscar memória:"):
+            term = message.split(":", 1)[1].strip()
+            if not term:
+                output_writer("Use: buscar memória: <termo>")
+                continue
+
+            matches = memory_store.search(term)
+            if matches:
+                output_writer("Resultados da busca:")
+                for memory in matches:
+                    output_writer(memory)
+            else:
+                output_writer("Nenhuma memória encontrada para o termo.")
+            continue
+
         context_message = _build_context_message(session_history, message, memory_store.list())
 
         try:
