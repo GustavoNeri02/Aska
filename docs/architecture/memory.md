@@ -17,14 +17,27 @@ Esses tipos descrevem a direção arquitetural, não componentes já implementad
 
 ## Política de captura
 
-- Memorizar quando o usuário pedir explicitamente.
-- Capturar automaticamente apenas informações claramente duradouras e úteis.
+- Hoje a captura ocorre somente quando o usuário solicita explicitamente via comando de memória no CLI.
+- Não há captura automática de fatos, preferências ou eventos ainda.
 - Evitar fatos passageiros sem utilidade futura.
 - Perguntar quando a relevância for ambígua.
 - Registrar origem, data, tipo e confiança quando possível.
 
+## Estado atual
+
+- Persistência JSON simples já implementada por meio de `MemoryStore`, em arquivo local quando o CLI é iniciado com um caminho explícito.
+- A captura acontece somente por comando explícito (`lembrar:`) no CLI.
+- A listagem das memórias salvas está disponível no CLI via comando `memórias`.
+- As memórias salvas são incluídas no prompt enviado ao modelo na próxima interação, junto com o histórico da sessão.
+- Edição, exclusão, pesquisa, metadados e explicabilidade ainda não foram implementados.
+
 ## Transparência e controle
 
-O usuário deve poder listar, pesquisar, editar e excluir memórias, marcá-las como temporárias ou permanentes e desativar a captura automática. O Aska deve conseguir explicar por que uma memória existe ou foi usada.
+O usuário deve poder listar, pesquisar, editar e excluir memórias, marcá-las como temporárias ou permanentes e desativar a captura automática. No estado atual, essa capacidade ainda é parcial e limitada à listagem explícita via CLI.
 
-A escolha entre JSON, SQLite ou outra persistência simples continua aberta e deve ocorrer apenas no incremento que introduzir memória persistente.
+## Limitações atuais
+
+- Todas as memórias salvas são enviadas em todas as requisições ao modelo; não há seleção por relevância.
+- O contexto é serializado como texto livre pelo CLI; não há estrutura intermediária, metadados ou explicabilidade.
+- Não há compactação, orçamento de tokens, edição, exclusão, pesquisa ou metadados para as memórias persistidas.
+- O histórico da sessão continua separado e apenas em memória durante a execução atual.

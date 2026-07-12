@@ -1,4 +1,5 @@
 from collections.abc import Callable, Iterator
+from pathlib import Path
 
 import pytest
 
@@ -7,6 +8,7 @@ from apps.cli.app import (
     run_conversation_loop,
 )
 from packages.models import ModelProviderError
+from packages.runtime.memory import MemoryStore
 
 
 class FakeProvider:
@@ -144,6 +146,106 @@ def test_conversation_reports_provider_error_and_keeps_running() -> None:
 
     assert "Aska > Modelo indisponível" in output
     assert "Até mais, Gustavo." in output
+
+
+def test_memory_store_persists_memories_to_disk(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+
+    assert store.list() == ["gosto de python"]
+    assert (tmp_path / "memories.json").exists()
+
+
+def test_memory_store_ignores_blank_entries(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("   ")
+
+    assert store.list() == []
+
+
+def test_memory_store_does_not_store_duplicates(tmp_path: Path) -> None:
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    store.add("gosto de python")
+    store.add("gosto de python")
+
+    assert store.list() == ["gosto de python"]
+
+
+def test_memory_store_persists_between_instances(tmp_path: Path) -> None:
+    path = tmp_path / "memories.json"
+    first_store = MemoryStore(path=path)
+    first_store.add("gosto de python")
+
+    second_store = MemoryStore(path=path)
+
+    assert second_store.list() == ["gosto de python"]
+
+
+def test_conversation_handles_invalid_json_without_broken_flow(tmp_path: Path) -> None:
+    output: list[str] = []
+    path = tmp_path / "memories.json"
+    path.write_text("{not valid json", encoding="utf-8")
+    store = MemoryStore(path=path)
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["memórias", "sair"]),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "(nenhuma memória registrada)" in output
+
+
+def test_run_conversation_loop_does_not_create_real_memory_file_without_injection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output: list[str] = []
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["lembrar: gosto de python", "sair"]),
+        output_writer=output.append,
+    )
+
+    assert not (tmp_path / "data" / "memory" / "memories.json").exists()
+
+
+def test_conversation_can_store_and_list_memories(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["lembrar: gosto de python", "memórias", "sair"]),
+        output_writer=output.append,
+        memory_store=store,
+    )
+
+    assert "Memória registrada localmente." in output
+    assert "gosto de python" in output
+
+
+def test_conversation_includes_saved_memories_in_model_context(tmp_path: Path) -> None:
+    provider = FakeProvider()
+    store = MemoryStore(path=tmp_path / "memories.json")
+
+    run_conversation_loop(
+        provider,
+        input_reader=create_input_reader(["lembrar: gosto de python", "Olá", "sair"]),
+        output_writer=lambda message: None,
+        memory_store=store,
+    )
+
+    assert len(provider.messages) == 1
+    assert "Memórias salvas:" in provider.messages[0]
+    assert "- gosto de python" in provider.messages[0]
+    assert "Você: Olá" in provider.messages[0]
 
 
 def test_conversation_does_not_include_provider_error_in_next_context() -> None:

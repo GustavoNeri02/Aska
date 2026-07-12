@@ -30,6 +30,10 @@ O primeiro adaptador usa a API HTTP local do Ollama atrás do contrato `ModelPro
 
 O modelo padrão é `gemma3:12b`, adequado à GPU principal com 16 GB de VRAM. A escolha permanece configurável por `ASKA_MODEL` e não faz parte do contrato interno.
 
+### Memória persistente local explícita — `in_progress`
+
+A primeira forma de memória persistente é um armazenamento local simples em JSON, acessado por comandos explícitos do CLI (`lembrar:` e `memórias`). Ainda não há captura automática, uso das memórias nas respostas do modelo nem metadados avançados.
+
 ## Decisões substituídas, rejeitadas ou adiadas
 
 - Automação como núcleo — `superseded` por conversa e IA pessoal como núcleo.

@@ -2,6 +2,7 @@ import os
 from collections.abc import Callable
 
 from packages.models import ModelProvider, ModelProviderError, OllamaProvider
+from packages.runtime.memory import MemoryStore
 
 EXIT_COMMANDS = frozenset(
     {
@@ -21,24 +22,38 @@ def build_banner() -> str:
     )
 
 
-def _build_context_message(history: list[tuple[str, str]], message: str) -> str:
-    if not history:
-        return message
+def _build_context_message(
+    history: list[tuple[str, str]],
+    message: str,
+    memories: list[str] | None = None,
+) -> str:
+    lines: list[str] = []
 
-    lines = ["Histórico da sessão:"]
-    for user_message, assistant_message in history:
-        lines.append(f"Você: {user_message}")
-        lines.append(f"Aska: {assistant_message}")
+    if memories:
+        lines.append("Memórias salvas:")
+        for memory in memories:
+            lines.append(f"- {memory}")
+        lines.append("")
 
-    lines.append("")
-    lines.append(f"Você: {message}")
-    return "\n".join(lines)
+    if history:
+        lines.append("Histórico da sessão:")
+        for user_message, assistant_message in history:
+            lines.append(f"Você: {user_message}")
+            lines.append(f"Aska: {assistant_message}")
+        lines.append("")
+
+    if lines:
+        lines.append(f"Você: {message}")
+        return "\n".join(lines)
+
+    return message
 
 
 def run_conversation_loop(
     provider: ModelProvider,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
+    memory_store: MemoryStore | None = None,
 ) -> None:
     output_writer(build_banner())
     output_writer("")
@@ -48,6 +63,7 @@ def run_conversation_loop(
     output_writer("")
 
     session_history: list[tuple[str, str]] = []
+    store = memory_store if memory_store is not None else MemoryStore()
 
     while True:
         try:
@@ -63,7 +79,24 @@ def run_conversation_loop(
             output_writer("Até mais, Gustavo.")
             return
 
-        context_message = _build_context_message(session_history, message)
+        if message.casefold() == "memórias":
+            memories = store.list()
+            output_writer("Memórias locais:")
+            if memories:
+                for memory in memories:
+                    output_writer(memory)
+            else:
+                output_writer("(nenhuma memória registrada)")
+            continue
+
+        if message.casefold().startswith("lembrar:"):
+            memory = message.split(":", 1)[1].strip()
+            if memory:
+                store.add(memory)
+                output_writer("Memória registrada localmente.")
+            continue
+
+        context_message = _build_context_message(session_history, message, store.list())
 
         try:
             response = provider.generate(context_message)
@@ -80,7 +113,7 @@ def main() -> None:
         model=os.getenv("ASKA_MODEL", "gemma3:12b"),
         base_url=os.getenv("ASKA_OLLAMA_URL", "http://localhost:11434"),
     )
-    run_conversation_loop(provider)
+    run_conversation_loop(provider, memory_store=MemoryStore(path="data/memory/memories.json"))
 
 
 if __name__ == "__main__":
