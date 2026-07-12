@@ -10,7 +10,7 @@ dependencies = []
 aska = "apps.cli.app:main"
 
 [tool.setuptools.packages.find]
-include = ["apps*"]
+include = ["apps*", "packages*"]
 
 [dependency-groups]
 dev = [

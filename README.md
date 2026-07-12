@@ -21,6 +21,16 @@ uv sync
 
 O `uv` cumpre aqui um papel próximo ao de `flutter pub get`, além de gerenciar o ambiente virtual e a versão do Python usada pelo projeto.
 
+## Modelo local
+
+O primeiro provider suportado é o [Ollama](https://docs.ollama.com/windows), cuja API local deve estar disponível em `http://localhost:11434`. O modelo padrão para a máquina principal do projeto é `gemma3:12b` e pode ser alterado por variável de ambiente:
+
+```powershell
+$env:ASKA_MODEL = "gemma3:12b"
+```
+
+O endereço do Ollama também pode ser alterado com `ASKA_OLLAMA_URL`.
+
 ## Executar
 
 ```bash

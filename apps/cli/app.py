@@ -1,4 +1,7 @@
+import os
 from collections.abc import Callable
+
+from packages.models import ModelProvider, ModelProviderError, OllamaProvider
 
 EXIT_COMMANDS = frozenset(
     {
@@ -18,12 +21,22 @@ def build_banner() -> str:
     )
 
 
-def build_placeholder_response(message: str) -> str:
-    del message
-    return "Aska ainda não possui um modelo conectado."
+def _build_context_message(history: list[tuple[str, str]], message: str) -> str:
+    if not history:
+        return message
+
+    lines = ["Histórico da sessão:"]
+    for user_message, assistant_message in history:
+        lines.append(f"Você: {user_message}")
+        lines.append(f"Aska: {assistant_message}")
+
+    lines.append("")
+    lines.append(f"Você: {message}")
+    return "\n".join(lines)
 
 
 def run_conversation_loop(
+    provider: ModelProvider,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
 ) -> None:
@@ -33,6 +46,8 @@ def run_conversation_loop(
     output_writer("")
     output_writer("Digite 'sair' para encerrar.")
     output_writer("")
+
+    session_history: list[tuple[str, str]] = []
 
     while True:
         try:
@@ -48,12 +63,24 @@ def run_conversation_loop(
             output_writer("Até mais, Gustavo.")
             return
 
-        response = build_placeholder_response(message)
+        context_message = _build_context_message(session_history, message)
+
+        try:
+            response = provider.generate(context_message)
+        except ModelProviderError as error:
+            output_writer(f"Aska > {error}")
+            continue
+
+        session_history.append((message, response))
         output_writer(f"Aska > {response}")
 
 
 def main() -> None:
-    run_conversation_loop()
+    provider = OllamaProvider(
+        model=os.getenv("ASKA_MODEL", "gemma3:12b"),
+        base_url=os.getenv("ASKA_OLLAMA_URL", "http://localhost:11434"),
+    )
+    run_conversation_loop(provider)
 
 
 if __name__ == "__main__":

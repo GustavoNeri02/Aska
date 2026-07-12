@@ -46,5 +46,8 @@
     "**/data/logs": true
   },
 
-  "terminal.integrated.defaultProfile.windows": "PowerShell"
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "chat.tools.terminal.autoApprove": {
+    "uv": true
+  }
 }

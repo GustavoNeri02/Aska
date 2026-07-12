@@ -20,18 +20,21 @@
 - Testes do comportamento principal do CLI.
 - README e documentação modular inicial.
 - Encerramento e entradas de borda cobertos por testes automatizados.
+- Contrato mínimo de provider e adaptador HTTP para Ollama.
+- Provider injetado no CLI com tratamento de indisponibilidade.
+- Ollama e Gemma 3 12B validados com uma resposta local ponta a ponta.
 
 ### Próximo incremento
 
-Definir o contrato mínimo de mensagens e provider antes de escolher o primeiro runtime e modelo locais. O núcleo não deve importar um provider concreto.
+Iniciar o contexto da sessão mantendo o histórico apenas em memória, sem antecipar persistência.
 
 ## Roadmap
 
 | Fase | Nome | Objetivo | Status |
 | --- | --- | --- | --- |
 | 0 | Foundation | Setup, monorepo, documentação e qualidade | `implemented` |
-| 1 | CLI and local conversation | CLI e primeira conversa com modelo local substituível | `in_progress` |
-| 2 | Session context | Histórico e contexto útil na sessão | `planned` |
+| 1 | CLI and local conversation | CLI e primeira conversa com modelo local substituível | `implemented` |
+| 2 | Session context | Histórico e contexto útil na sessão | `implemented` |
 | 3 | Persistent memory | Memória local transparente e consultável | `planned` |
 | 4 | Tools and capabilities | Registro seguro e primeira capability | `planned` |
 | 5 | Knowledge and retrieval | Indexação de documentos, código e informações | `planned` |
