@@ -1,5 +1,7 @@
 import os
+import subprocess
 from collections.abc import Callable
+from contextlib import suppress
 
 from apps.cli.command_parser import parse_input
 from apps.cli.commands import ChatMessage, ExitCommand, InvalidCommand, MemoryCommand
@@ -68,14 +70,20 @@ def run_conversation_loop(
 
 
 def main() -> None:
+    model = os.getenv("ASKA_MODEL", "gemma3:12b")
     model_provider = OllamaProvider(
-        model=os.getenv("ASKA_MODEL", "gemma3:12b"),
+        model=model,
         base_url=os.getenv("ASKA_OLLAMA_URL", "http://localhost:11434"),
     )
     memory_data_source = JsonMemoryDataSource("data/memory/memories.json")
     memory_repository = LocalMemoryRepository(memory_data_source)
     memory_service = MemoryService(memory_repository)
-    run_conversation_loop(model_provider, memory_service=memory_service)
+
+    try:
+        run_conversation_loop(model_provider, memory_service=memory_service)
+    finally:
+        with suppress(OSError):
+            subprocess.run(["ollama", "stop", model], check=False)
 
 
 if __name__ == "__main__":

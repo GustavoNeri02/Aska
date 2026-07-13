@@ -5,6 +5,7 @@ import pytest
 
 from apps.cli.app import (
     build_banner,
+    main,
     run_conversation_loop,
 )
 from packages.conversation import ModelProviderError
@@ -79,6 +80,42 @@ def test_build_banner_contains_application_name() -> None:
     banner = build_banner()
 
     assert "Aska" in banner
+
+
+def test_main_stops_configured_ollama_model_on_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ASKA_MODEL", "custom-model")
+    monkeypatch.setattr("apps.cli.app.run_conversation_loop", lambda *args, **kwargs: None)
+    commands: list[tuple[list[str], bool]] = []
+
+    monkeypatch.setattr(
+        "apps.cli.app.subprocess.run",
+        lambda command, check: commands.append((command, check)),
+    )
+
+    main()
+
+    assert commands == [(["ollama", "stop", "custom-model"], False)]
+
+
+def test_main_stops_ollama_model_when_conversation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("unexpected failure")
+
+    commands: list[list[str]] = []
+    monkeypatch.setattr("apps.cli.app.run_conversation_loop", fail)
+    monkeypatch.setattr(
+        "apps.cli.app.subprocess.run",
+        lambda command, check: commands.append(command),
+    )
+
+    with pytest.raises(RuntimeError, match="unexpected failure"):
+        main()
+
+    assert commands == [["ollama", "stop", "gemma3:12b"]]
 
 
 def test_conversation_sends_message_to_provider(tmp_path: Path) -> None:

@@ -25,6 +25,7 @@
 - Contrato mínimo de provider e adaptador HTTP para Ollama.
 - Provider injetado no CLI com tratamento de indisponibilidade.
 - Ollama e Gemma 3 12B validados com uma resposta local ponta a ponta.
+- O modelo carregado pelo Ollama é descarregado ao encerrar o CLI.
 
 ### Comportamento atual
 
