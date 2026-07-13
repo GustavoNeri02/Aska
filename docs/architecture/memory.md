@@ -40,7 +40,7 @@ Esses tipos descrevem a direção arquitetural, não componentes já implementad
 - A remoção explícita de uma memória salva está disponível por meio do comando `esquecer:` com correspondência exata.
 - A edição explícita de uma memória salva está disponível por meio do comando `editar memória: <texto atual> -> <novo texto>` com correspondência exata e sem duplicação.
 - A pesquisa textual explícita de memórias salvas está disponível por meio do comando `buscar memória: <termo>` com correspondência parcial e sem distinção de maiúsculas/minúsculas.
-- A edição natural está implementada somente para `Meu nome agora é <novo nome>` e `Mude meu nome para <novo nome>`. O sistema localiza deterministicamente uma única memória no formato `Meu nome é ...` ou `Eu me chamo ...`, apresenta o conteúdo atual e o novo conteúdo e só executa após confirmação explícita.
+- A edição natural está implementada somente para mudança do nome de Gustavo. `Meu nome agora é <novo nome>` e `Mude meu nome para <novo nome>` seguem como caminho determinístico; paráfrases que passam por um gate local podem ser classificadas pelo modelo mediante JSON estrito. O modelo apenas propõe o novo nome e não recebe IDs. O sistema localiza localmente uma única memória no formato `Meu nome é ...` ou `Eu me chamo ...`, apresenta o conteúdo atual e o novo conteúdo e só executa após confirmação explícita.
 - A edição natural usa ID estável e snapshot do conteúdo esperado. ID inválido, memória ausente, conteúdo divergente ou duplicado não são persistidos. Comandos literais de memória continuam disponíveis e cancelam uma proposta pendente antes de executar.
 - Em cada interação conversacional, `ConversationService` consulta as memórias persistidas pelo contrato `MemoryReader` e delega ao `ContextBuilder` a inclusão do conteúdo na mensagem `system`, junto da identidade estável do Aska. O histórico da sessão segue em mensagens separadas com papéis `user` e `assistant`, inclusive quando as memórias vêm de execuções anteriores. O CLI apenas compõe e injeta o `MemoryService` e despacha os comandos de entrada.
 - Das memórias, somente `content` é enviado ao modelo; IDs e metadados permanecem locais por padrão.
@@ -54,7 +54,7 @@ O usuário deve poder listar, pesquisar, editar e excluir memórias, marcá-las 
 - Todas as memórias salvas são enviadas em todas as requisições ao modelo; não há seleção por relevância.
 - O conteúdo das memórias ainda é serializado como uma lista textual dentro da mensagem `system`; a estrutura e os metadados persistidos não são expostos ao modelo.
 - Não há compactação, orçamento de tokens, tipos avançados ou explicabilidade além da origem e das datas mínimas.
-- A interpretação de pedidos de memória por modelo permanece `planned`; não há JSON produzido pelo modelo, tool calling ou interpretação probabilística neste incremento.
+- A interpretação por modelo está limitada à proposta de alteração do nome, sem tool calling. JSON inválido, campos ou ações desconhecidos e nomes vazios são rejeitados sem produzir proposta. Criação, exclusão, edição genérica e demais pedidos naturais de memória permanecem `planned`.
 - A interface atual é o CLI, mas detecção e representação da proposta não dependem dele e poderão ser reutilizadas por voz no futuro.
 - O histórico da sessão continua separado e apenas em memória durante a execução atual.
 - JSON continua sendo o armazenamento atual. SQLite é uma evolução provável quando consultas, volume ou atomicidade justificarem a mudança, mas ainda não foi adotado.

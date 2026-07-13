@@ -1,9 +1,27 @@
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import pytest
 
-from packages.conversation import detect_name_change, find_name_memory_candidates
+from packages.conversation import (
+    ModelMemoryIntentInterpreter,
+    ModelMessage,
+    NameUpdateIntent,
+    detect_name_change,
+    find_name_memory_candidates,
+    should_interpret_name_change,
+)
 from packages.memory import Memory, MemorySource
+
+
+class StaticProvider:
+    def __init__(self, response: str) -> None:
+        self.response = response
+        self.requests: list[list[ModelMessage]] = []
+
+    def generate(self, messages: Sequence[ModelMessage]) -> str:
+        self.requests.append(list(messages))
+        return self.response
 
 
 @pytest.mark.parametrize(
@@ -64,3 +82,52 @@ def test_find_name_memory_candidates_uses_restricted_text_patterns() -> None:
     ]
 
     assert find_name_memory_candidates(memories) == memories[:2]
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Pode atualizar meu nome para Gustavo Neri?",
+        "Quero que você passe a me chamar de Gustavo Neri.",
+        "Meu nome mudou para Gustavo Neri.",
+        "De agora em diante me chame de Gustavo Neri.",
+    ],
+)
+def test_name_change_gate_accepts_explicit_name_change_language(message: str) -> None:
+    assert should_interpret_name_change(message) is True
+
+
+@pytest.mark.parametrize("message", ["Olá", "Como vai?", "Como devo te chamar?"])
+def test_name_change_gate_rejects_common_messages(message: str) -> None:
+    assert should_interpret_name_change(message) is False
+
+
+def test_model_interpreter_returns_typed_name_update() -> None:
+    provider = StaticProvider('{"action":"update_name","new_name":"Gustavo Neri"}')
+    interpreter = ModelMemoryIntentInterpreter(provider)
+
+    result = interpreter.interpret("Pode atualizar meu nome para Gustavo Neri?")
+
+    assert result == NameUpdateIntent("Gustavo Neri")
+    assert len(provider.requests) == 1
+    assert provider.requests[0][-1].content == "Pode atualizar meu nome para Gustavo Neri?"
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        '{"action":"none"}',
+        '```json\n{"action":"none"}\n```',
+        'Texto {"action":"none"}',
+        '{"action":"none","extra":true}',
+        '{"action":"delete_name","new_name":"Gustavo Neri"}',
+        '{"action":"update_name","new_name":""}',
+        '{"action":"update_name","new_name":"Gustavo Neri","extra":true}',
+        '[{"action":"none"}]',
+        "not-json",
+    ],
+)
+def test_model_interpreter_rejects_none_or_invalid_responses(response: str) -> None:
+    interpreter = ModelMemoryIntentInterpreter(StaticProvider(response))
+
+    assert interpreter.interpret("Meu nome mudou") is None

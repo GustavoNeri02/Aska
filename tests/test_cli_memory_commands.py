@@ -3,7 +3,12 @@ from pathlib import Path
 import pytest
 
 from apps.cli.app import run_conversation_loop
+from packages.conversation import (
+    ModelMemoryIntentInterpreter,
+    NameUpdateIntent,
+)
 from tests.cli_support import (
+    FakeMemoryIntentInterpreter,
     FakeProvider,
     create_input_reader,
     create_memory_service,
@@ -353,6 +358,7 @@ def test_conversation_includes_saved_memories_in_model_context(tmp_path: Path) -
 
 def test_natural_name_edit_proposes_without_changing_persistence(tmp_path: Path) -> None:
     output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Nome não utilizado"))
     store = create_memory_service(path=tmp_path / "memories.json")
     original = store.add("Meu nome é Gustavo.").memory
     assert original is not None
@@ -362,12 +368,14 @@ def test_natural_name_edit_proposes_without_changing_persistence(tmp_path: Path)
         input_reader=create_input_reader(["Meu nome agora é Gustavo Neri", "sair"]),
         output_writer=output.append,
         memory_service=store,
+        memory_intent_interpreter=interpreter,
     )
 
     assert "Ação proposta: editar memória" in output
     assert "Conteúdo atual: Meu nome é Gustavo." in output
     assert "Novo conteúdo: Meu nome é Gustavo Neri." in output
     assert store.list() == [original]
+    assert interpreter.inputs == []
 
 
 def test_natural_name_edit_confirmation_executes_only_once(tmp_path: Path) -> None:
@@ -435,6 +443,7 @@ def test_ambiguous_confirmation_does_not_execute_edit(tmp_path: Path) -> None:
 def test_literal_memory_command_cancels_pending_edit_before_execution(tmp_path: Path) -> None:
     output: list[str] = []
     provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Gustavo Neri"))
     store = create_memory_service(path=tmp_path / "memories.json")
     store.add("Meu nome é Gustavo.")
 
@@ -442,7 +451,7 @@ def test_literal_memory_command_cancels_pending_edit_before_execution(tmp_path: 
         provider,
         input_reader=create_input_reader(
             [
-                "Meu nome agora é Gustavo Neri",
+                "Pode atualizar meu nome para Gustavo Neri?",
                 "editar memória: Meu nome é Gustavo. -> Meu nome é Gustavo Souza.",
                 "sim",
                 "sair",
@@ -450,12 +459,14 @@ def test_literal_memory_command_cancels_pending_edit_before_execution(tmp_path: 
         ),
         output_writer=output.append,
         memory_service=store,
+        memory_intent_interpreter=interpreter,
     )
 
     assert "Proposta de edição anterior cancelada." in output
     assert store.list()[0].content == "Meu nome é Gustavo Souza."
     assert len(provider.messages) == 1
     assert provider.messages[0][-1].content == "sim"
+    assert interpreter.inputs == ["Pode atualizar meu nome para Gustavo Neri?"]
 
 
 def test_natural_name_edit_reports_missing_candidate_without_proposal(tmp_path: Path) -> None:
@@ -524,3 +535,185 @@ def test_natural_name_edit_does_not_report_success_when_persistence_fails(
     assert "Memória editada localmente." not in output
     assert any("Não foi possível acessar as memórias:" in message for message in output)
     assert store.list() == [original]
+
+
+def test_interpreted_name_change_proposes_without_persisting(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Gustavo Neri"))
+    store = create_memory_service(path=tmp_path / "memories.json")
+    original = store.add("Meu nome é Gustavo.").memory
+    assert original is not None
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["Quero que você passe a me chamar de Gustavo Neri.", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: editar memória" in output
+    assert "Novo conteúdo: Meu nome é Gustavo Neri." in output
+    assert store.list() == [original]
+
+
+def test_interpreted_name_change_confirmation_executes_only_once(tmp_path: Path) -> None:
+    output: list[str] = []
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Gustavo Neri"))
+    store = create_memory_service(path=tmp_path / "memories.json")
+    store.add("Meu nome é Gustavo.")
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["Meu nome mudou para Gustavo Neri.", "sim", "confirmar", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert store.list()[0].content == "Meu nome é Gustavo Neri."
+    assert output.count("Memória editada localmente.") == 1
+    assert len(provider.messages) == 1
+    assert provider.messages[0][-1].content == "confirmar"
+
+
+def test_interpreted_name_change_cancellation_does_not_persist(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Gustavo Neri"))
+    store = create_memory_service(path=tmp_path / "memories.json")
+    original = store.add("Meu nome é Gustavo.").memory
+    assert original is not None
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["De agora em diante me chame de Gustavo Neri.", "cancelar", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Edição de memória cancelada." in output
+    assert store.list() == [original]
+
+
+def test_none_interpretation_falls_back_to_normal_conversation(tmp_path: Path) -> None:
+    output: list[str] = []
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(None)
+    store = create_memory_service(path=tmp_path / "memories.json")
+    original = store.add("Meu nome é Gustavo.").memory
+    assert original is not None
+
+    message = "Pode atualizar meu nome talvez?"
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: editar memória" not in output
+    assert "Aska > Resposta local" in output
+    assert provider.messages[0][-1].content == message
+    assert store.list() == [original]
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "not-json",
+        '{"action":"delete_name","new_name":"Gustavo Neri"}',
+        '{"action":"update_name","new_name":""}',
+    ],
+)
+def test_invalid_model_interpretation_never_persists(
+    response: str,
+    tmp_path: Path,
+) -> None:
+    output: list[str] = []
+    conversation_provider = FakeProvider()
+    interpretation_provider = FakeProvider(response=response)
+    interpreter = ModelMemoryIntentInterpreter(interpretation_provider)
+    store = create_memory_service(path=tmp_path / "memories.json")
+    original = store.add("Meu nome é Gustavo.").memory
+    assert original is not None
+
+    run_conversation_loop(
+        conversation_provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Pode atualizar meu nome para Gustavo Neri?", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: editar memória" not in output
+    assert store.list() == [original]
+    assert len(conversation_provider.messages) == 1
+
+
+@pytest.mark.parametrize("candidate_count", [0, 2])
+def test_interpreted_name_change_does_not_choose_invalid_candidate_count(
+    candidate_count: int,
+    tmp_path: Path,
+) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Gustavo Neri"))
+    store = create_memory_service(path=tmp_path / "memories.json")
+    if candidate_count == 2:
+        store.add("Meu nome é Gustavo.")
+        store.add("Eu me chamo Gustavo Souza.")
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Pode atualizar meu nome para Gustavo Neri?", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: editar memória" not in output
+    assert len(store.list()) == candidate_count
+
+
+def test_common_message_does_not_call_memory_interpreter(tmp_path: Path) -> None:
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Não utilizado"))
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Como vai?", "sair"]),
+        output_writer=lambda message: None,
+        memory_service=create_temp_memory_service(tmp_path),
+    )
+
+    assert interpreter.inputs == []
+    assert len(provider.messages) == 1
+
+
+def test_interpretation_does_not_enter_conversation_history(tmp_path: Path) -> None:
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Gustavo Neri"))
+    store = create_memory_service(path=tmp_path / "memories.json")
+    store.add("Meu nome é Gustavo.")
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["Meu nome mudou para Gustavo Neri.", "cancelar", "Olá", "sair"]
+        ),
+        output_writer=lambda message: None,
+        memory_service=store,
+    )
+
+    assert len(provider.messages) == 1
+    assert [message.content for message in provider.messages[0][1:]] == ["Olá"]

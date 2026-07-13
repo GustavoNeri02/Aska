@@ -48,9 +48,9 @@ O contrato `ModelProvider` pertence a `packages/conversation`, camada que o cons
 
 A identidade estável do Aska pertence a `packages/conversation` e é enviada como mensagem `system`, independentemente do modelo configurado. Mensagens de Gustavo e respostas da Aska preservam respectivamente os papéis `user` e `assistant`; memórias fornecem apenas contexto textual na mensagem de sistema, sem expor identidade ou metadados persistidos. Neste incremento não existe sistema genérico de personas, prompts ou templates.
 
-### Edição natural determinística de nome — `implemented`
+### Edição natural confirmada de nome — `implemented`
 
-O primeiro pedido natural de gerenciamento de memória reconhece somente mudança do nome de Gustavo por dois padrões textuais explícitos. A proposta é representada em `packages/conversation`, exige exatamente uma memória candidata e confirmação local, e é executada por `MemoryService` usando ID estável e snapshot. O modelo não interpreta a intenção nem produz ações ou JSON. Os comandos literais permanecem como fallback, o fluxo poderá ser reutilizado por voz e uma interpretação probabilística mais ampla continua `planned`.
+O primeiro pedido natural de gerenciamento de memória reconhece somente mudança do nome de Gustavo. Dois padrões explícitos formam o caminho rápido; um gate local encaminha apenas paráfrases relacionadas a nome para um intérprete provider-agnostic, que aceita JSON estrito e devolve somente uma proposta tipada. O modelo não recebe IDs nem executa ações. A proposta exige exatamente uma memória candidata e confirmação local, e é executada por `MemoryService` usando ID estável e snapshot. Os comandos literais permanecem como fallback, o fluxo poderá ser reutilizado por voz e pedidos naturais mais amplos continuam `planned`.
 
 ## Decisões substituídas, rejeitadas ou adiadas
 

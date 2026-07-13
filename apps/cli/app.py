@@ -12,11 +12,15 @@ from apps.cli.handlers import (
 from apps.cli.loading import run_with_loading
 from packages.conversation import (
     ConversationService,
+    MemoryIntentInterpreter,
+    ModelMemoryIntentInterpreter,
     ModelProvider,
     ModelProviderError,
     PendingMemoryEdit,
+    canonical_name_memory,
     detect_name_change,
     find_name_memory_candidates,
+    should_interpret_name_change,
 )
 from packages.inference import OllamaProvider
 from packages.memory import (
@@ -39,6 +43,7 @@ def build_banner() -> str:
 def run_conversation_loop(
     model_provider: ModelProvider,
     memory_service: MemoryService,
+    memory_intent_interpreter: MemoryIntentInterpreter | None = None,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
 ) -> None:
@@ -98,6 +103,14 @@ def run_conversation_loop(
                     continue
 
                 new_content = detect_name_change(parsed_input.content)
+                if (
+                    new_content is None
+                    and memory_intent_interpreter is not None
+                    and should_interpret_name_change(parsed_input.content)
+                ):
+                    intent = memory_intent_interpreter.interpret(parsed_input.content)
+                    if intent is not None:
+                        new_content = canonical_name_memory(intent.new_name)
                 if new_content is not None:
                     candidates = find_name_memory_candidates(memory_service.list())
                     if not candidates:
@@ -134,6 +147,7 @@ def main() -> None:
     memory_data_source = JsonMemoryDataSource("data/memory/memories.json")
     memory_repository = LocalMemoryRepository(memory_data_source)
     memory_service = MemoryService(memory_repository)
+    memory_intent_interpreter = ModelMemoryIntentInterpreter(model_provider)
 
     try:
         try:
@@ -141,7 +155,11 @@ def main() -> None:
         except ModelProviderError as error:
             print(f"Aska > {error}")
             return
-        run_conversation_loop(model_provider, memory_service=memory_service)
+        run_conversation_loop(
+            model_provider,
+            memory_service=memory_service,
+            memory_intent_interpreter=memory_intent_interpreter,
+        )
     finally:
         with suppress(ModelProviderError):
             model_provider.unload()

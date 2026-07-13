@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 
-from packages.conversation import ModelMessage, ModelProviderError
+from packages.conversation import ModelMessage, ModelProviderError, NameUpdateIntent
 from packages.memory import JsonMemoryDataSource, LocalMemoryRepository, MemoryService
 
 
@@ -41,6 +41,16 @@ class FailingThenWorkingProvider:
             self._should_fail = False
             raise ModelProviderError("Modelo indisponível")
         return self.response
+
+
+class FakeMemoryIntentInterpreter:
+    def __init__(self, result: NameUpdateIntent | None) -> None:
+        self.result = result
+        self.inputs: list[str] = []
+
+    def interpret(self, user_input: str) -> NameUpdateIntent | None:
+        self.inputs.append(user_input)
+        return self.result
 
 
 def create_input_reader(messages: list[str]) -> Callable[[str], str]:
