@@ -1,5 +1,6 @@
 from apps.cli.handlers.memory import handle_memory_command
 from apps.cli.handlers.natural_memory import (
+    NaturalMemoryHandler,
     present_memory_add_proposal,
     present_memory_add_result,
     present_memory_delete_proposal,
@@ -9,6 +10,7 @@ from apps.cli.handlers.natural_memory import (
 )
 
 __all__ = [
+    "NaturalMemoryHandler",
     "handle_memory_command",
     "present_memory_add_proposal",
     "present_memory_add_result",
