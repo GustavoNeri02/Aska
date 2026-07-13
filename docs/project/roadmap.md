@@ -28,12 +28,14 @@
 - O modelo carregado pelo Ollama é descarregado via API ao encerrar o CLI, respeitando o servidor configurado por `ASKA_OLLAMA_URL`.
 - O CLI exibe um loading enquanto conecta ao Ollama e carrega o modelo no início.
 - O núcleo conversacional envia identidade, histórico e mensagem atual com papéis estruturados e independentes do modelo.
+- Mudanças naturais do nome de Gustavo geram uma proposta determinística, exigem confirmação e editam a memória por ID e snapshot.
 
 ### Comportamento atual
 
 - Session Context está implementado e usa histórico em memória com papéis `user` e `assistant` durante a conversa atual; a identidade mínima do Aska é enviada como mensagem `system`.
 - A orquestração de conversa e a construção de contexto estão separadas do CLI; entradas do terminal são convertidas em comandos tipados antes da execução.
 - Persistent Memory está `in_progress` e já suporta persistência JSON estruturada com identidade e metadados mínimos, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
+- A edição natural de memória está implementada somente para mudança de nome, sem interpretação pelo modelo; pedidos naturais mais amplos permanecem `planned`.
 - O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.
 
 ### Incremento atual de memória explícita

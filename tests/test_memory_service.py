@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
 
+import pytest
+
 from packages.memory import AddMemoryStatus, EditMemoryStatus, Memory, MemoryService
 
 
@@ -142,3 +144,78 @@ def test_service_searches_exact_partial_and_accented_content() -> None:
     assert [memory.content for memory in service.search("CAFÉ")] == ["café da manhã"]
     assert [memory.content for memory in service.search("café da manhã")] == ["café da manhã"]
     assert service.search("almoço") == []
+
+
+def test_edit_by_id_preserves_identity_source_and_creation_date() -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+    original = service.add("Meu nome é Gustavo.").memory
+    assert original is not None
+
+    status = service.edit_by_id(original.id, original.content, "Meu nome é Gustavo Neri.")
+    edited = repository.memories[0]
+
+    assert status is EditMemoryStatus.EDITED
+    assert edited.id == original.id
+    assert edited.source == original.source
+    assert edited.created_at == original.created_at
+    assert edited.updated_at > original.updated_at
+    assert edited.content == "Meu nome é Gustavo Neri."
+
+
+def test_edit_by_id_rejects_divergent_snapshot() -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+    original = service.add("Meu nome é Gustavo.").memory
+    assert original is not None
+    service.edit(original.content, "Meu nome é Gustavo Souza.")
+
+    status = service.edit_by_id(
+        original.id,
+        original.content,
+        "Meu nome é Gustavo Neri.",
+    )
+
+    assert status is EditMemoryStatus.CONFLICT
+    assert repository.memories[0].content == "Meu nome é Gustavo Souza."
+
+
+@pytest.mark.parametrize(
+    ("memory_id", "expected_status"),
+    [
+        ("not-a-uuid", EditMemoryStatus.INVALID),
+        ("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", EditMemoryStatus.NOT_FOUND),
+    ],
+)
+def test_edit_by_id_rejects_invalid_or_missing_id_without_persisting(
+    memory_id: str,
+    expected_status: EditMemoryStatus,
+) -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+    original = service.add("Meu nome é Gustavo.").memory
+    assert original is not None
+
+    status = service.edit_by_id(memory_id, original.content, "Meu nome é Gustavo Neri.")
+
+    assert status is expected_status
+    assert repository.memories == [original]
+
+
+def test_edit_by_id_rejects_duplicate_content_without_persisting() -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+    original = service.add("Meu nome é Gustavo.").memory
+    assert original is not None
+    service = MemoryService(
+        repository,
+        id_factory=lambda: "87654321-4321-8765-4321-876543218765",
+        clock=lambda: datetime(2026, 7, 12, tzinfo=UTC),
+    )
+    duplicate = service.add("Meu nome é Gustavo Neri.").memory
+    assert duplicate is not None
+
+    status = service.edit_by_id(original.id, original.content, duplicate.content)
+
+    assert status is EditMemoryStatus.DUPLICATE
+    assert repository.memories == [original, duplicate]

@@ -349,3 +349,178 @@ def test_conversation_includes_saved_memories_in_model_context(tmp_path: Path) -
     assert memory.id not in system_content
     assert memory.source.value not in system_content
     assert memory.created_at.isoformat() not in system_content
+
+
+def test_natural_name_edit_proposes_without_changing_persistence(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = create_memory_service(path=tmp_path / "memories.json")
+    original = store.add("Meu nome é Gustavo.").memory
+    assert original is not None
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["Meu nome agora é Gustavo Neri", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: editar memória" in output
+    assert "Conteúdo atual: Meu nome é Gustavo." in output
+    assert "Novo conteúdo: Meu nome é Gustavo Neri." in output
+    assert store.list() == [original]
+
+
+def test_natural_name_edit_confirmation_executes_only_once(tmp_path: Path) -> None:
+    output: list[str] = []
+    provider = FakeProvider()
+    store = create_memory_service(path=tmp_path / "memories.json")
+    original = store.add("Meu nome é Gustavo.").memory
+    assert original is not None
+
+    run_conversation_loop(
+        provider,
+        input_reader=create_input_reader(
+            ["Mude meu nome para Gustavo Neri", "confirmar", "confirmo", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    edited = store.list()[0]
+    assert edited.content == "Meu nome é Gustavo Neri."
+    assert edited.id == original.id
+    assert output.count("Memória editada localmente.") == 1
+    assert len(provider.messages) == 1
+    assert provider.messages[0][-1].content == "confirmo"
+
+
+@pytest.mark.parametrize("cancellation", ["não", "nao", "cancelar", "cancela"])
+def test_natural_name_edit_cancellation_does_not_change_memory(
+    cancellation: str,
+    tmp_path: Path,
+) -> None:
+    output: list[str] = []
+    store = create_memory_service(path=tmp_path / "memories.json")
+    original = store.add("Meu nome é Gustavo.").memory
+    assert original is not None
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["Meu nome agora é Gustavo Neri", cancellation, "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Edição de memória cancelada." in output
+    assert store.list() == [original]
+
+
+def test_ambiguous_confirmation_does_not_execute_edit(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = create_memory_service(path=tmp_path / "memories.json")
+    original = store.add("Meu nome é Gustavo.").memory
+    assert original is not None
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["Meu nome agora é Gustavo Neri", "pode ser", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert any("Confirmação não reconhecida" in message for message in output)
+    assert store.list() == [original]
+
+
+def test_literal_memory_command_cancels_pending_edit_before_execution(tmp_path: Path) -> None:
+    output: list[str] = []
+    provider = FakeProvider()
+    store = create_memory_service(path=tmp_path / "memories.json")
+    store.add("Meu nome é Gustavo.")
+
+    run_conversation_loop(
+        provider,
+        input_reader=create_input_reader(
+            [
+                "Meu nome agora é Gustavo Neri",
+                "editar memória: Meu nome é Gustavo. -> Meu nome é Gustavo Souza.",
+                "sim",
+                "sair",
+            ]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Proposta de edição anterior cancelada." in output
+    assert store.list()[0].content == "Meu nome é Gustavo Souza."
+    assert len(provider.messages) == 1
+    assert provider.messages[0][-1].content == "sim"
+
+
+def test_natural_name_edit_reports_missing_candidate_without_proposal(tmp_path: Path) -> None:
+    output: list[str] = []
+    provider = FakeProvider()
+    store = create_memory_service(path=tmp_path / "memories.json")
+    store.add("Gosto de Python.")
+
+    run_conversation_loop(
+        provider,
+        input_reader=create_input_reader(["Meu nome agora é Gustavo Neri", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Não encontrei uma memória de nome para atualizar." in output
+    assert "Ação proposta: editar memória" not in output
+    assert provider.messages == []
+
+
+def test_natural_name_edit_reports_multiple_candidates_without_choosing(
+    tmp_path: Path,
+) -> None:
+    output: list[str] = []
+    store = create_memory_service(path=tmp_path / "memories.json")
+    store.add("Meu nome é Gustavo.")
+    store.add("Eu me chamo Gustavo Souza.")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["Meu nome agora é Gustavo Neri", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert any("mais de uma memória de nome" in message for message in output)
+    assert "Ação proposta: editar memória" not in output
+    assert [memory.content for memory in store.list()] == [
+        "Meu nome é Gustavo.",
+        "Eu me chamo Gustavo Souza.",
+    ]
+
+
+def test_natural_name_edit_does_not_report_success_when_persistence_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output: list[str] = []
+    store = create_memory_service(path=tmp_path / "memories.json")
+    original = store.add("Meu nome é Gustavo.").memory
+    assert original is not None
+
+    def fail_replace(source: object, destination: object) -> None:
+        del source, destination
+        raise OSError("falha simulada")
+
+    monkeypatch.setattr("packages.memory.data.json_data_source.os.replace", fail_replace)
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["Meu nome agora é Gustavo Neri", "sim", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Memória editada localmente." not in output
+    assert any("Não foi possível acessar as memórias:" in message for message in output)
+    assert store.list() == [original]
