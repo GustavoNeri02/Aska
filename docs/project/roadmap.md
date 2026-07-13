@@ -29,18 +29,19 @@
 - O CLI exibe um loading enquanto conecta ao Ollama e carrega o modelo no início.
 - O núcleo conversacional envia identidade, histórico e mensagem atual com papéis estruturados e independentes do modelo.
 - Mudanças naturais do nome de Gustavo usam padrões determinísticos ou interpretação limitada por modelo para gerar uma proposta; confirmação e edição por ID e snapshot permanecem locais.
+- Pedidos naturais explícitos de memorização podem gerar uma proposta de inclusão; somente a confirmação local aciona `MemoryService.add()`.
 
 ### Comportamento atual
 
 - Session Context está implementado e usa histórico em memória com papéis `user` e `assistant` durante a conversa atual; a identidade mínima do Aska é enviada como mensagem `system`.
 - A orquestração de conversa e a construção de contexto estão separadas do CLI; entradas do terminal são convertidas em comandos tipados antes da execução.
 - Persistent Memory está `in_progress` e já suporta persistência JSON estruturada com identidade e metadados mínimos, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
-- A edição natural de memória está implementada somente para mudança de nome. O modelo pode interpretar paráfrases após um gate local, mas apenas propõe; confirmação e persistência permanecem locais. Pedidos naturais mais amplos continuam `planned`.
+- A interpretação natural está implementada somente para edição do nome e criação explícita de uma memória. Gates locais evitam interpretação de conversas comuns; o modelo apenas propõe, enquanto confirmação e persistência permanecem locais. Captura automática, exclusão natural, edição genérica e pedidos mais amplos continuam `planned`.
 - O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.
 
 ### Incremento atual de memória explícita
 
-O incremento atual de Persistent Memory implementa exclusivamente objetos com `id`, `content`, `source`, `created_at` e `updated_at` em JSON. O CLI continua expondo os comandos atuais e envia somente o conteúdo das memórias ao modelo.
+O incremento atual de Persistent Memory implementa exclusivamente objetos com `id`, `content`, `source`, `created_at` e `updated_at` em JSON. O CLI continua expondo os comandos atuais, aceita criação natural explícita com confirmação e envia somente o conteúdo das memórias ao modelo. JSON permanece como armazenamento atual.
 
 ### Limitações atuais do incremento
 

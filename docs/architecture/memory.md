@@ -17,7 +17,7 @@ Esses tipos descrevem a direção arquitetural, não componentes já implementad
 
 ## Política de captura
 
-- Hoje a captura ocorre somente quando o usuário solicita explicitamente via comando de memória no CLI.
+- Hoje a captura ocorre somente quando o usuário solicita explicitamente por comando literal ou confirma uma proposta de criação natural no CLI.
 - Não há captura automática de fatos, preferências ou eventos ainda.
 - Evitar fatos passageiros sem utilidade futura.
 - Perguntar quando a relevância for ambígua.
@@ -35,12 +35,13 @@ Esses tipos descrevem a direção arquitetural, não componentes já implementad
 - Cada memória possui `id` local estável, `content`, `source`, `created_at` e `updated_at`. A origem implementada neste incremento é `explicit_cli`, e as datas usam UTC em formato ISO 8601.
 - O único formato aceito é uma lista JSON de objetos estruturados; listas de strings não são mais suportadas.
 - JSON inválido não é tratado como lista vazia nem sobrescrito: o repositório reporta `MemoryRepositoryError`, e o CLI traduz a falha sem encerrar a sessão.
-- A captura acontece somente por comando explícito (`lembrar:`) no CLI.
+- A captura acontece por comando explícito (`lembrar:`) ou por pedido natural explícito que gere uma proposta e seja confirmado localmente no CLI.
 - A listagem das memórias salvas está disponível no CLI via comando `memórias`.
 - A remoção explícita de uma memória salva está disponível por meio do comando `esquecer:` com correspondência exata.
 - A edição explícita de uma memória salva está disponível por meio do comando `editar memória: <texto atual> -> <novo texto>` com correspondência exata e sem duplicação.
 - A pesquisa textual explícita de memórias salvas está disponível por meio do comando `buscar memória: <termo>` com correspondência parcial e sem distinção de maiúsculas/minúsculas.
 - A edição natural está implementada somente para mudança do nome de Gustavo. `Meu nome agora é <novo nome>` e `Mude meu nome para <novo nome>` seguem como caminho determinístico; paráfrases que passam por um gate local podem ser classificadas pelo modelo mediante JSON estrito. O modelo apenas propõe o novo nome e não recebe IDs. O sistema localiza localmente uma única memória no formato `Meu nome é ...` ou `Eu me chamo ...`, apresenta o conteúdo atual e o novo conteúdo e só executa após confirmação explícita.
+- A criação natural aceita somente pedidos explícitos de memorização que passam por um gate local, como `lembre que`, `memorize que`, `guarde que` e `não esqueça que`. O modelo propõe uma única memória por JSON estrito, seu conteúdo integral é apresentado e `MemoryService.add()` só é chamado após confirmação explícita. Não existe captura automática de fatos durante conversas comuns.
 - A edição natural usa ID estável e snapshot do conteúdo esperado. ID inválido, memória ausente, conteúdo divergente ou duplicado não são persistidos. Comandos literais de memória continuam disponíveis e cancelam uma proposta pendente antes de executar.
 - Em cada interação conversacional, `ConversationService` consulta as memórias persistidas pelo contrato `MemoryReader` e delega ao `ContextBuilder` a inclusão do conteúdo na mensagem `system`, junto da identidade estável do Aska. O histórico da sessão segue em mensagens separadas com papéis `user` e `assistant`, inclusive quando as memórias vêm de execuções anteriores. O CLI apenas compõe e injeta o `MemoryService` e despacha os comandos de entrada.
 - Das memórias, somente `content` é enviado ao modelo; IDs e metadados permanecem locais por padrão.
@@ -54,7 +55,7 @@ O usuário deve poder listar, pesquisar, editar e excluir memórias, marcá-las 
 - Todas as memórias salvas são enviadas em todas as requisições ao modelo; não há seleção por relevância.
 - O conteúdo das memórias ainda é serializado como uma lista textual dentro da mensagem `system`; a estrutura e os metadados persistidos não são expostos ao modelo.
 - Não há compactação, orçamento de tokens, tipos avançados ou explicabilidade além da origem e das datas mínimas.
-- A interpretação por modelo está limitada à proposta de alteração do nome, sem tool calling. JSON inválido, campos ou ações desconhecidos e nomes vazios são rejeitados sem produzir proposta. Criação, exclusão, edição genérica e demais pedidos naturais de memória permanecem `planned`.
+- A interpretação por modelo está limitada às propostas de alteração do nome e criação explícita de uma memória, sem tool calling. JSON inválido, campos ou ações desconhecidos e conteúdo vazio são rejeitados sem produzir proposta. Exclusão natural, edição genérica e ações de memória mais amplas permanecem `planned`.
 - A interface atual é o CLI, mas detecção e representação da proposta não dependem dele e poderão ser reutilizadas por voz no futuro.
 - O histórico da sessão continua separado e apenas em memória durante a execução atual.
 - JSON continua sendo o armazenamento atual. SQLite é uma evolução provável quando consultas, volume ou atomicidade justificarem a mudança, mas ainda não foi adotado.

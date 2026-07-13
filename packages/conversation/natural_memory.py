@@ -25,12 +25,20 @@ _NAME_CHANGE_GATE_TERMS = (
     re.compile(r"\b(passe|quero|agora|diante)\b.*\bcham\w*\b", re.IGNORECASE),
     re.compile(r"\bcham\w*\b.*\b(passe|quero|agora|diante)\b", re.IGNORECASE),
 )
-_INTERPRETER_INSTRUCTION = """Classifique somente se a mensagem pede para alterar o nome de Gustavo.
+_MEMORY_ADD_GATE_TERMS = (
+    re.compile(r"\b(?:lembre|lembrar|memorize|memorizar|guarde|guardar)\b.*\bque\b", re.IGNORECASE),
+    re.compile(r"\bnão\s+esqueça\b.*\bque\b", re.IGNORECASE),
+)
+_INTERPRETER_INSTRUCTION = """Classifique somente se a mensagem pede explicitamente para:
+- alterar o nome de Gustavo; ou
+- guardar uma única informação como memória.
 Responda com exatamente um objeto JSON, sem Markdown ou texto adicional.
 Formatos permitidos:
 {"action":"update_name","new_name":"Novo Nome"}
+{"action":"add_memory","content":"Informação a guardar."}
 {"action":"none"}
-Não execute ações e não invente informações."""
+Preserve o significado e negações da informação original.
+Não execute ações, não informe sucesso e não invente informações."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,19 +49,32 @@ class PendingMemoryEdit:
 
 
 @dataclass(frozen=True, slots=True)
+class PendingMemoryAdd:
+    content: str
+
+
+@dataclass(frozen=True, slots=True)
 class NameUpdateIntent:
     new_name: str
 
 
+@dataclass(frozen=True, slots=True)
+class AddMemoryIntent:
+    content: str
+
+
+type MemoryIntent = NameUpdateIntent | AddMemoryIntent
+
+
 class MemoryIntentInterpreter(Protocol):
-    def interpret(self, user_input: str) -> NameUpdateIntent | None: ...
+    def interpret(self, user_input: str) -> MemoryIntent | None: ...
 
 
 class ModelMemoryIntentInterpreter:
     def __init__(self, model_provider: ModelProvider) -> None:
         self._model_provider = model_provider
 
-    def interpret(self, user_input: str) -> NameUpdateIntent | None:
+    def interpret(self, user_input: str) -> MemoryIntent | None:
         response = self._model_provider.generate(
             [
                 ModelMessage(ModelRole.SYSTEM, _INTERPRETER_INSTRUCTION),
@@ -80,6 +101,13 @@ def should_interpret_name_change(user_input: str) -> bool:
     return any(pattern.search(message) for pattern in _NAME_CHANGE_GATE_TERMS)
 
 
+def should_interpret_memory_intent(user_input: str) -> bool:
+    message = user_input.strip()
+    return should_interpret_name_change(message) or any(
+        pattern.search(message) for pattern in _MEMORY_ADD_GATE_TERMS
+    )
+
+
 def canonical_name_memory(new_name: str) -> str:
     return f"Meu nome é {new_name}."
 
@@ -92,7 +120,7 @@ def find_name_memory_candidates(memories: Sequence[Memory]) -> list[Memory]:
     ]
 
 
-def _parse_interpretation(response: str) -> NameUpdateIntent | None:
+def _parse_interpretation(response: str) -> MemoryIntent | None:
     try:
         data = json.loads(response)
     except (json.JSONDecodeError, TypeError):
@@ -102,7 +130,20 @@ def _parse_interpretation(response: str) -> NameUpdateIntent | None:
         return None
     if data == {"action": "none"}:
         return None
-    if set(data) != {"action", "new_name"} or data.get("action") != "update_name":
+
+    action = data.get("action")
+    if action == "add_memory":
+        if set(data) != {"action", "content"}:
+            return None
+        content = data.get("content")
+        if not isinstance(content, str):
+            return None
+        normalized_content = content.strip()
+        if not normalized_content or "\n" in normalized_content or "\r" in normalized_content:
+            return None
+        return AddMemoryIntent(normalized_content)
+
+    if action != "update_name" or set(data) != {"action", "new_name"}:
         return None
 
     new_name = data.get("new_name")

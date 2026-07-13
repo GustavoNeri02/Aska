@@ -4,6 +4,7 @@ import pytest
 
 from apps.cli.app import run_conversation_loop
 from packages.conversation import (
+    AddMemoryIntent,
     ModelMemoryIntentInterpreter,
     NameUpdateIntent,
 )
@@ -713,6 +714,219 @@ def test_interpretation_does_not_enter_conversation_history(tmp_path: Path) -> N
         ),
         output_writer=lambda message: None,
         memory_service=store,
+    )
+
+    assert len(provider.messages) == 1
+    assert [message.content for message in provider.messages[0][1:]] == ["Olá"]
+
+
+def test_interpreted_memory_add_proposes_without_persisting(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Eu trabalho com Flutter."))
+    store = create_temp_memory_service(tmp_path)
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Lembre que eu trabalho com Flutter.", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: adicionar memória" in output
+    assert "Conteúdo: Eu trabalho com Flutter." in output
+    assert store.list() == []
+
+
+def test_interpreted_memory_add_confirmation_executes_only_once(tmp_path: Path) -> None:
+    output: list[str] = []
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Eu trabalho com Flutter."))
+    store = create_temp_memory_service(tmp_path)
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["Guarde que eu trabalho com Flutter.", "confirmar", "confirmo", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert [memory.content for memory in store.list()] == ["Eu trabalho com Flutter."]
+    assert output.count("Memória registrada localmente.") == 1
+    assert provider.messages[0][-1].content == "confirmo"
+
+
+def test_interpreted_memory_add_cancellation_does_not_persist(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Prefiro respostas diretas."))
+    store = create_temp_memory_service(tmp_path)
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["Não esqueça que prefiro respostas diretas.", "cancelar", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Inclusão de memória cancelada." in output
+    assert store.list() == []
+
+
+def test_interpreted_memory_add_reports_duplicate(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Eu trabalho com Flutter."))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Lembre que eu trabalho com Flutter.", "sim", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Já existe uma memória com esse conteúdo." in output
+    assert store.list() == [original]
+
+
+def test_interpreted_memory_add_does_not_report_success_on_persistence_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Eu trabalho com Flutter."))
+    store = create_temp_memory_service(tmp_path)
+
+    def fail_replace(source: object, destination: object) -> None:
+        del source, destination
+        raise OSError("falha simulada")
+
+    monkeypatch.setattr("packages.memory.data.json_data_source.os.replace", fail_replace)
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Lembre que eu trabalho com Flutter.", "sim", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Memória registrada localmente." not in output
+    assert any("Não foi possível acessar as memórias:" in message for message in output)
+
+
+def test_literal_command_cancels_pending_memory_add(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Eu trabalho com Flutter."))
+    store = create_temp_memory_service(tmp_path)
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["Lembre que eu trabalho com Flutter.", "lembrar: Uso Dart.", "sim", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Proposta de inclusão anterior cancelada." in output
+    assert [memory.content for memory in store.list()] == ["Uso Dart."]
+
+
+def test_exit_command_with_pending_memory_add_does_not_persist(tmp_path: Path) -> None:
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Eu trabalho com Flutter."))
+    store = create_temp_memory_service(tmp_path)
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Lembre que eu trabalho com Flutter.", "sair"]),
+        output_writer=lambda message: None,
+        memory_service=store,
+    )
+
+    assert store.list() == []
+
+
+@pytest.mark.parametrize("interruption", [EOFError(), KeyboardInterrupt()])
+def test_interruption_with_pending_memory_add_does_not_persist(
+    interruption: BaseException,
+    tmp_path: Path,
+) -> None:
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Eu trabalho com Flutter."))
+    store = create_temp_memory_service(tmp_path)
+    call_count = 0
+
+    def input_reader(_: str) -> str:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return "Lembre que eu trabalho com Flutter."
+        raise interruption
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=input_reader,
+        output_writer=lambda message: None,
+        memory_service=store,
+    )
+
+    assert store.list() == []
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        '{"action":"none"}',
+        "not-json",
+        '```json\n{"action":"add_memory","content":"Uso Flutter."}\n```',
+        '{"action":"add_memory","content":"Uso Flutter.","extra":true}',
+        '{"action":"add_memory","content":""}',
+        '{"action":"unknown","content":"Uso Flutter."}',
+    ],
+)
+def test_invalid_memory_add_interpretation_falls_back_to_conversation(
+    response: str,
+    tmp_path: Path,
+) -> None:
+    provider = FakeProvider()
+    interpreter = ModelMemoryIntentInterpreter(FakeProvider(response))
+    store = create_temp_memory_service(tmp_path)
+    message = "Lembre que eu uso Flutter."
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=lambda output: None,
+        memory_service=store,
+    )
+
+    assert store.list() == []
+    assert len(provider.messages) == 1
+    assert provider.messages[0][-1].content == message
+
+
+def test_memory_add_interpretation_does_not_enter_history(tmp_path: Path) -> None:
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Eu trabalho com Flutter."))
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["Lembre que eu trabalho com Flutter.", "não", "Olá", "sair"]
+        ),
+        output_writer=lambda output: None,
+        memory_service=create_temp_memory_service(tmp_path),
     )
 
     assert len(provider.messages) == 1

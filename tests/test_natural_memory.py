@@ -4,11 +4,13 @@ from datetime import UTC, datetime
 import pytest
 
 from packages.conversation import (
+    AddMemoryIntent,
     ModelMemoryIntentInterpreter,
     ModelMessage,
     NameUpdateIntent,
     detect_name_change,
     find_name_memory_candidates,
+    should_interpret_memory_intent,
     should_interpret_name_change,
 )
 from packages.memory import Memory, MemorySource
@@ -111,6 +113,62 @@ def test_model_interpreter_returns_typed_name_update() -> None:
     assert result == NameUpdateIntent("Gustavo Neri")
     assert len(provider.requests) == 1
     assert provider.requests[0][-1].content == "Pode atualizar meu nome para Gustavo Neri?"
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Lembre que eu trabalho com Flutter.",
+        "Quero lembrar que prefiro respostas diretas.",
+        "Memorize que estou aprendendo Python.",
+        "Você pode memorizar que estou aprendendo Python?",
+        "Guarde que prefiro respostas diretas.",
+        "Quero guardar que meu projeto principal é o Aska.",
+        "Não esqueça que meu projeto principal é o Aska.",
+    ],
+)
+def test_memory_intent_gate_accepts_explicit_memory_requests(message: str) -> None:
+    assert should_interpret_memory_intent(message) is True
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "O que você lembra sobre mim?",
+        "Quais são minhas memórias?",
+        "Como vai?",
+        "Você esqueceu meu nome?",
+        "Conte o que sabe sobre Flutter.",
+    ],
+)
+def test_memory_intent_gate_rejects_questions_and_common_messages(message: str) -> None:
+    assert should_interpret_memory_intent(message) is False
+
+
+def test_model_interpreter_returns_typed_memory_add() -> None:
+    provider = StaticProvider('{"action":"add_memory","content":"Eu trabalho com Flutter."}')
+    interpreter = ModelMemoryIntentInterpreter(provider)
+
+    result = interpreter.interpret("Lembre que eu trabalho com Flutter.")
+
+    assert result == AddMemoryIntent("Eu trabalho com Flutter.")
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        '```json\n{"action":"add_memory","content":"Gosto de Flutter."}\n```',
+        '{"action":"add_memory","content":"Gosto de Flutter.","extra":true}',
+        '{"action":"add_memory","content":""}',
+        '{"action":"add_memory","content":42}',
+        '{"action":"add_memory","content":"Uma memória.\nOutra memória."}',
+        '{"action":"unknown","content":"Gosto de Flutter."}',
+    ],
+)
+def test_model_interpreter_rejects_invalid_memory_add(response: str) -> None:
+    interpreter = ModelMemoryIntentInterpreter(StaticProvider(response))
+
+    assert interpreter.interpret("Lembre que gosto de Flutter.") is None
 
 
 @pytest.mark.parametrize(

@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 
-from packages.conversation import ModelMessage, ModelProviderError, NameUpdateIntent
+from packages.conversation import MemoryIntent, ModelMessage, ModelProviderError
 from packages.memory import JsonMemoryDataSource, LocalMemoryRepository, MemoryService
 
 
@@ -44,11 +44,11 @@ class FailingThenWorkingProvider:
 
 
 class FakeMemoryIntentInterpreter:
-    def __init__(self, result: NameUpdateIntent | None) -> None:
+    def __init__(self, result: MemoryIntent | None) -> None:
         self.result = result
         self.inputs: list[str] = []
 
-    def interpret(self, user_input: str) -> NameUpdateIntent | None:
+    def interpret(self, user_input: str) -> MemoryIntent | None:
         self.inputs.append(user_input)
         return self.result
 

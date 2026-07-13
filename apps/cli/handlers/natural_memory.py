@@ -1,7 +1,28 @@
 from collections.abc import Callable
 
-from packages.conversation import PendingMemoryEdit
-from packages.memory import EditMemoryStatus
+from packages.conversation import PendingMemoryAdd, PendingMemoryEdit
+from packages.memory import AddMemoryResult, AddMemoryStatus, EditMemoryStatus
+
+
+def present_memory_add_proposal(
+    pending_add: PendingMemoryAdd,
+    output_writer: Callable[[str], None],
+) -> None:
+    output_writer("Ação proposta: adicionar memória")
+    output_writer(f"Conteúdo: {pending_add.content}")
+    output_writer("Confirmar inclusão? Digite 'sim' para confirmar ou 'não' para cancelar.")
+
+
+def present_memory_add_result(
+    result: AddMemoryResult,
+    output_writer: Callable[[str], None],
+) -> None:
+    messages = {
+        AddMemoryStatus.ADDED: "Memória registrada localmente.",
+        AddMemoryStatus.DUPLICATE: "Já existe uma memória com esse conteúdo.",
+        AddMemoryStatus.INVALID: "O conteúdo proposto não é válido.",
+    }
+    output_writer(messages[result.status])
 
 
 def present_memory_edit_proposal(

@@ -32,7 +32,7 @@ O modelo padrão é `gemma3:12b`, adequado à GPU principal com 16 GB de VRAM. A
 
 ### Memória persistente local explícita — `in_progress`
 
-A primeira forma de memória persistente continua sendo o armazenamento local em JSON, exclusivamente com objetos contendo identidade estável, conteúdo, origem e datas de criação e alteração em UTC. Listas de strings não são suportadas. Os comandos explícitos do CLI permanecem responsáveis pela captura e controle, e somente o conteúdo é enviado ao modelo por padrão. SQLite é uma evolução provável quando o armazenamento simples deixar de atender, mas não foi adotado neste incremento.
+A primeira forma de memória persistente continua sendo o armazenamento local em JSON, exclusivamente com objetos contendo identidade estável, conteúdo, origem e datas de criação e alteração em UTC. Listas de strings não são suportadas. A captura ocorre por comando literal ou por proposta natural explícita confirmada; os comandos do CLI permanecem disponíveis para controle, e somente o conteúdo é enviado ao modelo por padrão. SQLite é uma evolução provável quando o armazenamento simples deixar de atender, mas não foi adotado neste incremento.
 
 O domínio e as regras de memória são separados da persistência por `MemoryService` e `MemoryRepository`. `LocalMemoryRepository` implementa o contrato e depende de `MemoryLocalDataSource`; `JsonMemoryDataSource` é a implementação atual, responsável por JSON, filesystem, cache lazy e escrita atômica. Essa separação foi adotada para permitir um futuro `SqliteMemoryDataSource` sem alterar os casos de aplicação. SQLite permanece `planned` e não foi implementado.
 
@@ -51,6 +51,10 @@ A identidade estável do Aska pertence a `packages/conversation` e é enviada co
 ### Edição natural confirmada de nome — `implemented`
 
 O primeiro pedido natural de gerenciamento de memória reconhece somente mudança do nome de Gustavo. Dois padrões explícitos formam o caminho rápido; um gate local encaminha apenas paráfrases relacionadas a nome para um intérprete provider-agnostic, que aceita JSON estrito e devolve somente uma proposta tipada. O modelo não recebe IDs nem executa ações. A proposta exige exatamente uma memória candidata e confirmação local, e é executada por `MemoryService` usando ID estável e snapshot. Os comandos literais permanecem como fallback, o fluxo poderá ser reutilizado por voz e pedidos naturais mais amplos continuam `planned`.
+
+### Criação natural explícita de memória — `implemented`
+
+Pedidos explícitos contendo formas restritas de `lembrar`, `memorizar`, `guardar` ou `não esquecer` passam por um gate local e podem produzir `AddMemoryIntent` por JSON estrito. O modelo apenas interpreta e propõe uma única memória: não recebe serviços ou IDs, não persiste e não informa sucesso. A proposta imutável exige confirmação local e somente então o CLI chama `MemoryService.add()`, apresentando seu resultado real. Captura automática, exclusão natural, edição genérica e frameworks de ações continuam `planned`.
 
 ## Decisões substituídas, rejeitadas ou adiadas
 
