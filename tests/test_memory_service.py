@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 
-from packages.memory.domain.model import Memory
-from packages.memory.domain.service import AddMemoryStatus, EditMemoryStatus, MemoryService
+from packages.memory import AddMemoryStatus, EditMemoryStatus, Memory, MemoryService
 
 
 class InMemoryRepository:

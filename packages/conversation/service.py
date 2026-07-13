@@ -3,7 +3,7 @@ from typing import Protocol
 from packages.conversation.context import ContextBuilder
 from packages.conversation.model import ConversationTurn
 from packages.conversation.provider import ModelProvider
-from packages.memory.domain.model import Memory
+from packages.memory import Memory
 
 
 class MemoryReader(Protocol):

@@ -2,7 +2,7 @@ import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from packages.conversation.provider import ModelProviderError
+from packages.conversation import ModelProviderError
 
 
 class OllamaProvider:

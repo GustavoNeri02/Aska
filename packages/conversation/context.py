@@ -1,5 +1,5 @@
 from packages.conversation.model import ConversationTurn
-from packages.memory.domain.model import Memory
+from packages.memory import Memory
 
 
 class ContextBuilder:
