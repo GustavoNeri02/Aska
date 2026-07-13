@@ -35,14 +35,16 @@ O modelo é um componente usado pela conversa e pelo raciocínio, não o sistema
 
 ## Regras de dependência
 
-- Apps dependem de contratos e pacotes internos, não de providers concretos.
+- Apps dependem de contratos e pacotes internos durante os casos de uso. O entry point pode importar adaptadores concretos exclusivamente para compor o grafo de dependências.
 - Conversation ou core não importa Ollama, Gemini, OpenAI ou outra API externa.
 - Infraestrutura implementa contratos das camadas internas.
 - Capabilities não importam detalhes internos umas das outras.
 - Interfaces de usuário não contêm lógica de IA, memória ou ferramentas.
 - Ações do sistema passam por política de segurança antes da execução.
 
-O contrato interno `ModelProvider` define a geração de respostas sem expor detalhes de infraestrutura. O primeiro adaptador implementado usa a API HTTP local do Ollama. llama.cpp, LM Studio e vLLM continuam alternativas futuras. Gemini, ChatGPT e outras IAs externas podem ajudar no desenvolvimento, mas não são dependências de runtime.
+O pacote `packages/conversation` concentra a orquestração da conversa, o histórico da sessão e a construção de contexto, sem depender do CLI. O CLI permanece como adaptador de entrada e saída e converte texto em comandos tipados.
+
+O contrato `ModelProvider` pertence a `packages/conversation`, que é seu consumidor. O pacote `packages/inference` contém o primeiro adaptador, que usa a API HTTP local do Ollama. llama.cpp, LM Studio e vLLM continuam alternativas futuras. Gemini, ChatGPT e outras IAs externas podem ajudar no desenvolvimento, mas não são dependências de runtime.
 
 ## Monorepo
 
@@ -61,7 +63,7 @@ aska/
 ```
 
 - `apps/`: interfaces executáveis, inicialmente o CLI.
-- `packages/`: bibliotecas internas compartilhadas.
+- `packages/`: features e limites internos compartilhados, atualmente conversa, memória e inferência.
 - `capabilities/`: funcionalidades independentes.
 - `docs/`: arquitetura, decisões, roadmap e pesquisa.
 - `scripts/`: desenvolvimento e manutenção.
@@ -69,6 +71,8 @@ aska/
 - `data/`: memória, logs, cache, índices e modelos locais.
 
 Não criar muitas pastas, classes ou módulos vazios. Uma abstração entra quando resolve uma responsabilidade real.
+
+Cada package expõe sua API pública por `__init__.py`, de forma semelhante a um barrel file em Dart. Apps e outras features usam essa API pública; módulos dentro da própria feature importam diretamente seus contratos e modelos para preservar a direção das dependências.
 
 ## Capabilities
 

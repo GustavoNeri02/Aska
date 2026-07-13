@@ -6,7 +6,8 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 
-from packages.models import ModelProviderError, OllamaProvider
+from packages.conversation import ModelProviderError
+from packages.inference import OllamaProvider
 
 
 class FakeHttpResponse(BytesIO):
@@ -20,7 +21,7 @@ class FakeHttpResponse(BytesIO):
 def test_ollama_provider_generates_chat_response() -> None:
     response = FakeHttpResponse(b'{"message":{"role":"assistant","content":"Ola!"}}')
 
-    with patch("packages.models.ollama.urlopen", return_value=response) as urlopen_mock:
+    with patch("packages.inference.ollama.urlopen", return_value=response) as urlopen_mock:
         provider = OllamaProvider(model="test-model")
 
         result = provider.generate("Olá")
@@ -37,7 +38,7 @@ def test_ollama_provider_generates_chat_response() -> None:
 
 
 def test_ollama_provider_reports_connection_error() -> None:
-    with patch("packages.models.ollama.urlopen", side_effect=URLError("offline")):
+    with patch("packages.inference.ollama.urlopen", side_effect=URLError("offline")):
         provider = OllamaProvider(model="test-model")
 
         with pytest.raises(ModelProviderError, match="conectar ao Ollama"):
@@ -53,7 +54,7 @@ def test_ollama_provider_reports_api_error() -> None:
         fp=BytesIO(b'{"error":"model not found"}'),
     )
 
-    with patch("packages.models.ollama.urlopen", side_effect=error):
+    with patch("packages.inference.ollama.urlopen", side_effect=error):
         provider = OllamaProvider(model="missing-model")
 
         with pytest.raises(ModelProviderError, match="erro 404: model not found"):
@@ -63,7 +64,7 @@ def test_ollama_provider_reports_api_error() -> None:
 def test_ollama_provider_rejects_invalid_response() -> None:
     response = FakeHttpResponse(b'{"done":true}')
 
-    with patch("packages.models.ollama.urlopen", return_value=response):
+    with patch("packages.inference.ollama.urlopen", return_value=response):
         provider = OllamaProvider(model="test-model")
 
         with pytest.raises(ModelProviderError, match="resposta inválida"):

@@ -34,7 +34,15 @@ O modelo padrão é `gemma3:12b`, adequado à GPU principal com 16 GB de VRAM. A
 
 A primeira forma de memória persistente continua sendo o armazenamento local em JSON, exclusivamente com objetos contendo identidade estável, conteúdo, origem e datas de criação e alteração em UTC. Listas de strings não são suportadas. Os comandos explícitos do CLI permanecem responsáveis pela captura e controle, e somente o conteúdo é enviado ao modelo por padrão. SQLite é uma evolução provável quando o armazenamento simples deixar de atender, mas não foi adotado neste incremento.
 
-O domínio de memória é separado do adaptador JSON por `MemoryRepository`. `JsonMemoryStore` usa cache lazy por instância para evitar I/O repetido, assumindo um único writer durante a execução do CLI.
+O domínio e as regras de memória são separados da persistência por `MemoryService` e `MemoryRepository`. `LocalMemoryRepository` implementa o contrato e depende de `MemoryLocalDataSource`; `JsonMemoryDataSource` é a implementação atual, responsável por JSON, filesystem, cache lazy e escrita atômica. Essa separação foi adotada para permitir um futuro `SqliteMemoryDataSource` sem alterar os casos de aplicação. SQLite permanece `planned` e não foi implementado.
+
+### Conversa independente da interface — `implemented`
+
+Histórico da sessão, composição de contexto e chamada ao modelo pertencem a `packages/conversation`. O CLI interpreta entradas em comandos tipados e apresenta resultados. A composição de `OllamaProvider`, `JsonMemoryDataSource`, `LocalMemoryRepository` e `MemoryService` continua manual no entry point, sem container de injeção de dependência.
+
+### Provider como port da conversa — `implemented`
+
+O contrato `ModelProvider` pertence a `packages/conversation`, camada que o consome. O adaptador Ollama fica em `packages/inference`. O nome anterior `packages/models` foi substituído por ser ambíguo com modelos de domínio.
 
 ## Decisões substituídas, rejeitadas ou adiadas
 
@@ -53,9 +61,7 @@ O domínio de memória é separado do adaptador JSON por `MemoryRepository`. `Js
 
 ## Decisões abertas
 
-- Evolução do contrato de mensagens quando contexto de sessão for implementado.
 - Critérios concretos para migrar a persistência de memória de JSON para SQLite.
-- Momento de separar `packages/conversation` e `packages/models`.
 - Formato do manifesto de capabilities.
 - Primeira capability concreta, provavelmente filesystem.
 - Tecnologia da interface desktop futura.

@@ -32,6 +32,7 @@ uv run aska
 - Escreva testes para comportamentos importantes e tratamento de erro proporcional ao estágio.
 - Use tipagem sem complexidade desnecessária.
 - Preserve os comandos definidos no `pyproject.toml`.
+- Use o `__init__.py` de cada package como API pública, equivalente a um barrel file do Dart. Consumidores externos importam pelo package; módulos internos usam imports diretos para evitar ciclos e carregamento acidental de adaptadores.
 - Não adicione dependências sem explicar o problema resolvido.
 - Não refatore áreas não relacionadas.
 - Entregue alterações pequenas, revisáveis e executáveis.
@@ -65,7 +66,7 @@ Use Conventional Commits, por exemplo:
 
 ```text
 feat(cli): add initial conversation loop
-feat(models): add local provider contract
+feat(inference): add local provider adapter
 test(memory): cover explicit memory storage
 docs(architecture): record provider abstraction
 fix(cli): handle interrupted input

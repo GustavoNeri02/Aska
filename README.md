@@ -4,7 +4,7 @@ Aska é uma IA pessoal local, conversacional e progressivamente multimodal. O pr
 
 ## Estado atual
 
-A Sprint 1 contém um CLI funcional que exibe uma saudação, recebe mensagens, ignora entradas vazias, encerra de forma controlada e responde com um placeholder. Modelo local, contexto, memória persistente e capabilities ainda estão planejados.
+O CLI conversa com o modelo local por meio do Ollama, mantém o histórico da sessão e oferece memória persistente explícita em JSON com listagem, busca, edição e exclusão. Persistent Memory permanece `in_progress`; capabilities de ferramentas e automação continuam `planned`.
 
 Veja o [estado detalhado e roadmap](docs/project/roadmap.md).
 

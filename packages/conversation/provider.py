@@ -2,7 +2,7 @@ from typing import Protocol
 
 
 class ModelProvider(Protocol):
-    def generate(self, message: str) -> str: ...
+    def generate(self, prompt: str) -> str: ...
 
 
 class ModelProviderError(RuntimeError):

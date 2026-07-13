@@ -2,7 +2,7 @@ import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from packages.models.provider import ModelProviderError
+from packages.conversation.provider import ModelProviderError
 
 
 class OllamaProvider:
@@ -16,11 +16,11 @@ class OllamaProvider:
         self._chat_url = f"{base_url.rstrip('/')}/api/chat"
         self._timeout = timeout
 
-    def generate(self, message: str) -> str:
+    def generate(self, prompt: str) -> str:
         payload = json.dumps(
             {
                 "model": self._model,
-                "messages": [{"role": "user", "content": message}],
+                "messages": [{"role": "user", "content": prompt}],
                 "stream": False,
             }
         ).encode("utf-8")
@@ -33,7 +33,7 @@ class OllamaProvider:
 
         try:
             with urlopen(request, timeout=self._timeout) as response:
-                result = json.load(response)
+                response_data = json.load(response)
         except HTTPError as error:
             detail = self._read_error_detail(error)
             raise ModelProviderError(f"Ollama respondeu com erro {error.code}: {detail}") from error
@@ -46,14 +46,14 @@ class OllamaProvider:
         except (json.JSONDecodeError, UnicodeDecodeError) as error:
             raise ModelProviderError("Ollama retornou uma resposta inválida.") from error
 
-        if not isinstance(result, dict):
-            raise ModelProviderError(f"Resposta inválida: {result}")
+        if not isinstance(response_data, dict):
+            raise ModelProviderError(f"Resposta inválida: {response_data}")
 
-        response_message = result.get("message")
-        if not isinstance(response_message, dict):
+        assistant_message_data = response_data.get("message")
+        if not isinstance(assistant_message_data, dict):
             raise ModelProviderError("resposta inválida")
 
-        content = response_message.get("content")
+        content = assistant_message_data.get("content")
         if not isinstance(content, str) or not content.strip():
             raise ModelProviderError("Ollama retornou uma resposta vazia.")
 
@@ -63,8 +63,8 @@ class OllamaProvider:
     def _read_error_detail(error: HTTPError) -> str:
         try:
             response = error.read().decode("utf-8")
-            result = json.loads(response)
-            detail = result.get("error", response)
+            error_data = json.loads(response)
+            detail = error_data.get("error", response)
             return detail if isinstance(detail, str) else response
         except (json.JSONDecodeError, UnicodeDecodeError):
             return error.reason

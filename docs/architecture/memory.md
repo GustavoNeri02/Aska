@@ -25,12 +25,16 @@ Esses tipos descrevem a direção arquitetural, não componentes já implementad
 
 ## Estado atual
 
-- Persistência JSON estruturada já implementada por meio de `JsonMemoryStore`, em arquivo local quando o CLI é iniciado com um caminho explícito.
-- A entidade `Memory` e o contrato `MemoryRepository` ficam separados do adaptador `JsonMemoryStore`; o CLI depende do contrato e escolhe JSON apenas no ponto de composição.
-- Cada instância de `JsonMemoryStore` carrega o arquivo de forma lazy e mantém as memórias em cache durante o processo, evitando leitura e desserialização repetidas em listagens, buscas e construção de contexto.
+- Persistência JSON estruturada implementada por meio de `JsonMemoryDataSource`, em arquivo local quando o CLI é iniciado com um caminho explícito.
+- `MemoryService` concentra identidade, datas, duplicidade, busca e edição e depende somente do contrato `MemoryRepository`.
+- `LocalMemoryRepository` implementa `MemoryRepository`, delega persistência ao contrato `MemoryLocalDataSource` e traduz erros da fonte local para `MemoryRepositoryError`.
+- `JsonMemoryDataSource` implementa a fonte local atual e concentra JSON, filesystem, cache lazy e escrita atômica. Um futuro `SqliteMemoryDataSource` poderá ocupar o mesmo limite sem alterar serviço ou repository.
+- O CLI escolhe `JsonMemoryDataSource`, `LocalMemoryRepository` e `MemoryService` apenas no ponto de composição.
+- Inclusão e edição retornam resultados explícitos para casos esperados, como duplicidade e valores inválidos, sem sobrecarregar exceptions como controle de fluxo. Falhas de persistência usam o erro abstrato `MemoryRepositoryError`.
+- As gravações usam arquivo temporário e substituição atômica; o cache só é atualizado depois que a persistência termina com sucesso.
 - Cada memória possui `id` local estável, `content`, `source`, `created_at` e `updated_at`. A origem implementada neste incremento é `explicit_cli`, e as datas usam UTC em formato ISO 8601.
 - O único formato aceito é uma lista JSON de objetos estruturados; listas de strings não são mais suportadas.
-- JSON inválido não é sobrescrito por operações de escrita; o armazenamento recusa a mutação para evitar perda silenciosa.
+- JSON inválido não é tratado como lista vazia nem sobrescrito: o repositório reporta `MemoryRepositoryError`, e o CLI traduz a falha sem encerrar a sessão.
 - A captura acontece somente por comando explícito (`lembrar:`) no CLI.
 - A listagem das memórias salvas está disponível no CLI via comando `memórias`.
 - A remoção explícita de uma memória salva está disponível por meio do comando `esquecer:` com correspondência exata.
@@ -41,13 +45,29 @@ Esses tipos descrevem a direção arquitetural, não componentes já implementad
 
 ## Transparência e controle
 
-O usuário deve poder listar, pesquisar, editar e excluir memórias, marcá-las como temporárias ou permanentes e desativar a captura automática. No estado atual, essa capacidade ainda é parcial e limitada à listagem explícita via CLI.
+O usuário deve poder listar, pesquisar, editar e excluir memórias, marcá-las como temporárias ou permanentes e desativar a captura automática. Listagem, pesquisa, edição e exclusão explícitas estão implementadas; temporalidade e configuração de captura automática continuam pendentes.
 
 ## Limitações atuais
 
 - Todas as memórias salvas são enviadas em todas as requisições ao modelo; não há seleção por relevância.
-- O contexto é serializado como texto livre pelo CLI; a estrutura e os metadados persistidos não são expostos ao modelo.
+- O contexto é serializado como texto livre por `ContextBuilder`; a estrutura e os metadados persistidos não são expostos ao modelo.
 - Não há compactação, orçamento de tokens, tipos avançados ou explicabilidade além da origem e das datas mínimas.
 - O histórico da sessão continua separado e apenas em memória durante a execução atual.
 - JSON continua sendo o armazenamento atual. SQLite é uma evolução provável quando consultas, volume ou atomicidade justificarem a mudança, mas ainda não foi adotado.
-- O cache assume que a instância do CLI é a responsável pelas alterações durante sua execução; mudanças externas no arquivo não são recarregadas automaticamente.
+- O cache do `JsonMemoryDataSource` assume que a instância do CLI é a responsável pelas alterações durante sua execução; mudanças externas no arquivo não são recarregadas automaticamente.
+
+## Dependências implementadas
+
+```text
+MemoryService
+    ↓
+MemoryRepository
+    ↑ implementa
+LocalMemoryRepository
+    ↓
+MemoryLocalDataSource
+    ↑ implementa
+JsonMemoryDataSource
+```
+
+`SqliteMemoryDataSource` continua `planned` e não foi criado neste incremento.
