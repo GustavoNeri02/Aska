@@ -42,7 +42,7 @@ Histórico da sessão, composição de contexto e chamada ao modelo pertencem a 
 
 ### Provider como port da conversa — `implemented`
 
-O contrato `ModelProvider` pertence a `packages/conversation`, camada que o consome. O adaptador Ollama fica em `packages/inference`. O nome anterior `packages/models` foi substituído por ser ambíguo com modelos de domínio.
+O contrato `ModelProvider` pertence a `packages/conversation`, camada que o consome, e permanece restrito a `generate()`. O adaptador Ollama fica em `packages/inference`; seu `warm_up()` e `unload()` são coordenados concretamente pelo composition root do CLI e não constituem um lifecycle abstrato de providers. Esse contrato só será ampliado quando existir necessidade comum entre providers. O nome anterior `packages/models` foi substituído por ser ambíguo com modelos de domínio.
 
 ## Decisões substituídas, rejeitadas ou adiadas
 
