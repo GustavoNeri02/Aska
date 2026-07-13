@@ -720,7 +720,9 @@ def test_interpretation_does_not_enter_conversation_history(tmp_path: Path) -> N
     assert [message.content for message in provider.messages[0][1:]] == ["Olá"]
 
 
-def test_interpreted_memory_add_proposes_without_persisting(tmp_path: Path) -> None:
+def test_deterministic_memory_add_proposes_without_interpreter_or_persistence(
+    tmp_path: Path,
+) -> None:
     output: list[str] = []
     interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Eu trabalho com Flutter."))
     store = create_temp_memory_service(tmp_path)
@@ -734,8 +736,9 @@ def test_interpreted_memory_add_proposes_without_persisting(tmp_path: Path) -> N
     )
 
     assert "Ação proposta: adicionar memória" in output
-    assert "Conteúdo: Eu trabalho com Flutter." in output
+    assert "Conteúdo: eu trabalho com Flutter." in output
     assert store.list() == []
+    assert interpreter.inputs == []
 
 
 def test_interpreted_memory_add_confirmation_executes_only_once(tmp_path: Path) -> None:
@@ -754,9 +757,10 @@ def test_interpreted_memory_add_confirmation_executes_only_once(tmp_path: Path) 
         memory_service=store,
     )
 
-    assert [memory.content for memory in store.list()] == ["Eu trabalho com Flutter."]
+    assert [memory.content for memory in store.list()] == ["eu trabalho com Flutter."]
     assert output.count("Memória registrada localmente.") == 1
     assert provider.messages[0][-1].content == "confirmo"
+    assert interpreter.inputs == []
 
 
 def test_interpreted_memory_add_cancellation_does_not_persist(tmp_path: Path) -> None:
@@ -776,13 +780,14 @@ def test_interpreted_memory_add_cancellation_does_not_persist(tmp_path: Path) ->
 
     assert "Inclusão de memória cancelada." in output
     assert store.list() == []
+    assert interpreter.inputs == []
 
 
 def test_interpreted_memory_add_reports_duplicate(tmp_path: Path) -> None:
     output: list[str] = []
     interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Eu trabalho com Flutter."))
     store = create_temp_memory_service(tmp_path)
-    original = store.add("Eu trabalho com Flutter.").memory
+    original = store.add("eu trabalho com Flutter.").memory
 
     run_conversation_loop(
         FakeProvider(),
@@ -900,7 +905,7 @@ def test_invalid_memory_add_interpretation_falls_back_to_conversation(
     provider = FakeProvider()
     interpreter = ModelMemoryIntentInterpreter(FakeProvider(response))
     store = create_temp_memory_service(tmp_path)
-    message = "Lembre que eu uso Flutter."
+    message = "Você pode memorizar que eu uso Flutter?"
 
     run_conversation_loop(
         provider,
@@ -923,7 +928,7 @@ def test_memory_add_interpretation_does_not_enter_history(tmp_path: Path) -> Non
         provider,
         memory_intent_interpreter=interpreter,
         input_reader=create_input_reader(
-            ["Lembre que eu trabalho com Flutter.", "não", "Olá", "sair"]
+            ["Você pode memorizar que eu trabalho com Flutter?", "não", "Olá", "sair"]
         ),
         output_writer=lambda output: None,
         memory_service=create_temp_memory_service(tmp_path),
@@ -931,3 +936,127 @@ def test_memory_add_interpretation_does_not_enter_history(tmp_path: Path) -> Non
 
     assert len(provider.messages) == 1
     assert [message.content for message in provider.messages[0][1:]] == ["Olá"]
+
+
+def test_add_gate_rejects_name_update_intent_and_falls_back_to_conversation(
+    tmp_path: Path,
+) -> None:
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Gustavo Neri"))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Meu nome é Gustavo.").memory
+    message = "Você pode memorizar que eu trabalho com Flutter?"
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=lambda output: None,
+        memory_service=store,
+    )
+
+    assert store.list() == [original]
+    assert len(provider.messages) == 1
+    assert provider.messages[0][-1].content == message
+    assert interpreter.inputs == [message]
+
+
+def test_name_gate_rejects_memory_add_intent_and_falls_back_to_conversation(
+    tmp_path: Path,
+) -> None:
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Meu nome é Gustavo Neri."))
+    store = create_temp_memory_service(tmp_path)
+    message = "Meu nome mudou para Gustavo Neri."
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=lambda output: None,
+        memory_service=store,
+    )
+
+    assert store.list() == []
+    assert len(provider.messages) == 1
+    assert provider.messages[0][-1].content == message
+    assert interpreter.inputs == [message]
+
+
+def test_name_gate_takes_precedence_when_both_gates_are_active(tmp_path: Path) -> None:
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Meu nome é Gustavo Neri."))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Meu nome é Gustavo.").memory
+    message = "Lembre que meu nome mudou para Gustavo Neri."
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=lambda output: None,
+        memory_service=store,
+    )
+
+    assert store.list() == [original]
+    assert len(provider.messages) == 1
+    assert provider.messages[0][-1].content == message
+    assert interpreter.inputs == [message]
+
+
+def test_both_gates_accept_name_update_intent_with_name_precedence(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Gustavo Neri"))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Meu nome é Gustavo.").memory
+    message = "Lembre que meu nome mudou para Gustavo Neri."
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: editar memória" in output
+    assert store.list() == [original]
+    assert interpreter.inputs == [message]
+
+
+def test_compatible_add_intent_still_creates_proposal(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Eu trabalho com Flutter."))
+    store = create_temp_memory_service(tmp_path)
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["Você pode memorizar que eu trabalho com Flutter?", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: adicionar memória" in output
+    assert store.list() == []
+    assert interpreter.inputs == ["Você pode memorizar que eu trabalho com Flutter?"]
+
+
+def test_compatible_name_intent_still_creates_edit_proposal(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Gustavo Neri"))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Meu nome é Gustavo.").memory
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Meu nome mudou para Gustavo Neri.", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: editar memória" in output
+    assert store.list() == [original]

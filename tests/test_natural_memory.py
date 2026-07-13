@@ -8,8 +8,10 @@ from packages.conversation import (
     ModelMemoryIntentInterpreter,
     ModelMessage,
     NameUpdateIntent,
+    detect_memory_add,
     detect_name_change,
     find_name_memory_candidates,
+    should_interpret_memory_add,
     should_interpret_memory_intent,
     should_interpret_name_change,
 )
@@ -55,6 +57,46 @@ def test_detect_name_change_rejects_empty_ambiguous_or_unrelated_messages(
     message: str,
 ) -> None:
     assert detect_name_change(message) is None
+
+
+@pytest.mark.parametrize(
+    ("message", "content"),
+    [
+        ("Lembre que eu trabalho com Flutter.", "eu trabalho com Flutter."),
+        ("Memorize que estou aprendendo Python.", "estou aprendendo Python."),
+        ("Guarde que prefiro respostas diretas.", "prefiro respostas diretas."),
+        ("Não esqueça que meu projeto principal é o Aska.", "meu projeto principal é o Aska."),
+        ("lEmBrE QuE   Uso Flutter.   ", "Uso Flutter."),
+    ],
+)
+def test_detect_memory_add_accepts_exact_patterns_and_preserves_content(
+    message: str,
+    content: str,
+) -> None:
+    assert detect_memory_add(message) == AddMemoryIntent(content)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Lembre que",
+        "Memorize que   ",
+        "Guarde que\nUso Flutter.",
+        "Não esqueça que uma coisa.\nOutra coisa.",
+    ],
+)
+def test_memory_add_rejects_empty_or_multiline_messages_before_interpretation(
+    message: str,
+) -> None:
+    assert detect_memory_add(message) is None
+    assert should_interpret_memory_add(message) is False
+
+
+def test_detect_memory_add_leaves_non_exact_paraphrase_for_interpreter() -> None:
+    message = "Você pode memorizar que uso Flutter?"
+
+    assert detect_memory_add(message) is None
+    assert should_interpret_memory_add(message) is True
 
 
 def test_find_name_memory_candidates_uses_restricted_text_patterns() -> None:
@@ -129,6 +171,7 @@ def test_model_interpreter_returns_typed_name_update() -> None:
 )
 def test_memory_intent_gate_accepts_explicit_memory_requests(message: str) -> None:
     assert should_interpret_memory_intent(message) is True
+    assert should_interpret_memory_add(message) is True
 
 
 @pytest.mark.parametrize(
@@ -143,6 +186,7 @@ def test_memory_intent_gate_accepts_explicit_memory_requests(message: str) -> No
 )
 def test_memory_intent_gate_rejects_questions_and_common_messages(message: str) -> None:
     assert should_interpret_memory_intent(message) is False
+    assert should_interpret_memory_add(message) is False
 
 
 def test_model_interpreter_returns_typed_memory_add() -> None:

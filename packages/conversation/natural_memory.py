@@ -12,6 +12,12 @@ _NAME_CHANGE_PATTERNS = (
     re.compile(r"meu nome agora é\s+(.+)", re.IGNORECASE),
     re.compile(r"mude meu nome para\s+(.+)", re.IGNORECASE),
 )
+_MEMORY_ADD_PATTERNS = (
+    re.compile(r"lembre\s+que\s*(.*)", re.IGNORECASE),
+    re.compile(r"memorize\s+que\s*(.*)", re.IGNORECASE),
+    re.compile(r"guarde\s+que\s*(.*)", re.IGNORECASE),
+    re.compile(r"não\s+esqueça\s+que\s*(.*)", re.IGNORECASE),
+)
 _NAME_COMPONENT = r"[^\W\d_]+(?:[-'’][^\W\d_]+)?"
 _NAME = re.compile(rf"{_NAME_COMPONENT}(?:\s+{_NAME_COMPONENT})*", re.UNICODE)
 _AMBIGUOUS_WORDS = frozenset({"e", "mas", "porque", "porém", "pois", "também"})
@@ -26,8 +32,11 @@ _NAME_CHANGE_GATE_TERMS = (
     re.compile(r"\bcham\w*\b.*\b(passe|quero|agora|diante)\b", re.IGNORECASE),
 )
 _MEMORY_ADD_GATE_TERMS = (
-    re.compile(r"\b(?:lembre|lembrar|memorize|memorizar|guarde|guardar)\b.*\bque\b", re.IGNORECASE),
-    re.compile(r"\bnão\s+esqueça\b.*\bque\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:lembre|lembrar|memorize|memorizar|guarde|guardar)\b.*\bque\b\s+\S",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bnão\s+esqueça\b.*\bque\b\s+\S", re.IGNORECASE),
 )
 _INTERPRETER_INSTRUCTION = """Classifique somente se a mensagem pede explicitamente para:
 - alterar o nome de Gustavo; ou
@@ -96,16 +105,33 @@ def detect_name_change(user_input: str) -> str | None:
     return None
 
 
+def detect_memory_add(user_input: str) -> AddMemoryIntent | None:
+    message = user_input.strip()
+    if "\n" in message or "\r" in message:
+        return None
+    for pattern in _MEMORY_ADD_PATTERNS:
+        match = pattern.fullmatch(message)
+        if match is None:
+            continue
+        content = match.group(1).strip()
+        return AddMemoryIntent(content) if content else None
+    return None
+
+
 def should_interpret_name_change(user_input: str) -> bool:
     message = user_input.strip()
     return any(pattern.search(message) for pattern in _NAME_CHANGE_GATE_TERMS)
 
 
-def should_interpret_memory_intent(user_input: str) -> bool:
+def should_interpret_memory_add(user_input: str) -> bool:
     message = user_input.strip()
-    return should_interpret_name_change(message) or any(
-        pattern.search(message) for pattern in _MEMORY_ADD_GATE_TERMS
-    )
+    if "\n" in message or "\r" in message:
+        return False
+    return any(pattern.search(message) for pattern in _MEMORY_ADD_GATE_TERMS)
+
+
+def should_interpret_memory_intent(user_input: str) -> bool:
+    return should_interpret_name_change(user_input) or should_interpret_memory_add(user_input)
 
 
 def canonical_name_memory(new_name: str) -> str:

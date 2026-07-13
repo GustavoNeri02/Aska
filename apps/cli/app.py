@@ -23,9 +23,11 @@ from packages.conversation import (
     PendingMemoryAdd,
     PendingMemoryEdit,
     canonical_name_memory,
+    detect_memory_add,
     detect_name_change,
     find_name_memory_candidates,
-    should_interpret_memory_intent,
+    should_interpret_memory_add,
+    should_interpret_name_change,
 )
 from packages.inference import OllamaProvider
 from packages.memory import (
@@ -120,15 +122,22 @@ def run_conversation_loop(
                     continue
 
                 new_content = detect_name_change(parsed_input.content)
+                name_gate = should_interpret_name_change(parsed_input.content)
+                add_gate = should_interpret_memory_add(parsed_input.content)
+                deterministic_add = detect_memory_add(parsed_input.content)
+                if new_content is None and not name_gate and deterministic_add is not None:
+                    pending_memory_action = PendingMemoryAdd(deterministic_add.content)
+                    present_memory_add_proposal(pending_memory_action, output_writer)
+                    continue
                 if (
                     new_content is None
                     and memory_intent_interpreter is not None
-                    and should_interpret_memory_intent(parsed_input.content)
+                    and (name_gate or add_gate)
                 ):
                     intent = memory_intent_interpreter.interpret(parsed_input.content)
-                    if isinstance(intent, NameUpdateIntent):
+                    if name_gate and isinstance(intent, NameUpdateIntent):
                         new_content = canonical_name_memory(intent.new_name)
-                    elif isinstance(intent, AddMemoryIntent):
+                    elif not name_gate and add_gate and isinstance(intent, AddMemoryIntent):
                         pending_memory_action = PendingMemoryAdd(intent.content)
                         present_memory_add_proposal(pending_memory_action, output_writer)
                         continue

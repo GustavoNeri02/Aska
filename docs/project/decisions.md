@@ -54,7 +54,7 @@ O primeiro pedido natural de gerenciamento de memória reconhece somente mudanç
 
 ### Criação natural explícita de memória — `implemented`
 
-Pedidos explícitos contendo formas restritas de `lembrar`, `memorizar`, `guardar` ou `não esquecer` passam por um gate local e podem produzir `AddMemoryIntent` por JSON estrito. O modelo apenas interpreta e propõe uma única memória: não recebe serviços ou IDs, não persiste e não informa sucesso. A proposta imutável exige confirmação local e somente então o CLI chama `MemoryService.add()`, apresentando seu resultado real. Captura automática, exclusão natural, edição genérica e frameworks de ações continuam `planned`.
+Pedidos explícitos nos padrões completos `lembre que`, `memorize que`, `guarde que` ou `não esqueça que` produzem `AddMemoryIntent` deterministicamente, preservando o conteúdo informado e sem chamar o modelo. Paráfrases passam por um gate local e podem produzir a mesma intenção por JSON estrito. O modelo apenas interpreta e propõe uma única memória: não recebe serviços ou IDs, não persiste e não informa sucesso. A proposta imutável exige confirmação local e somente então o CLI chama `MemoryService.add()`, apresentando seu resultado real. Captura automática, exclusão natural, edição genérica e frameworks de ações continuam `planned`.
 
 ## Decisões substituídas, rejeitadas ou adiadas
 

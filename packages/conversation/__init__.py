@@ -10,8 +10,10 @@ from packages.conversation.natural_memory import (
     PendingMemoryAdd,
     PendingMemoryEdit,
     canonical_name_memory,
+    detect_memory_add,
     detect_name_change,
     find_name_memory_candidates,
+    should_interpret_memory_add,
     should_interpret_memory_intent,
     should_interpret_name_change,
 )
@@ -35,8 +37,10 @@ __all__ = [
     "PendingMemoryAdd",
     "PendingMemoryEdit",
     "canonical_name_memory",
+    "detect_memory_add",
     "detect_name_change",
     "find_name_memory_candidates",
+    "should_interpret_memory_add",
     "should_interpret_name_change",
     "should_interpret_memory_intent",
 ]
