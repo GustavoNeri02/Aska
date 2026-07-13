@@ -1,5 +1,4 @@
 import os
-import subprocess
 from collections.abc import Callable
 from contextlib import suppress
 
@@ -88,8 +87,8 @@ def main() -> None:
             return
         run_conversation_loop(model_provider, memory_service=memory_service)
     finally:
-        with suppress(OSError):
-            subprocess.run(["ollama", "stop", model], check=False)
+        with suppress(ModelProviderError):
+            model_provider.unload()
 
 
 if __name__ == "__main__":

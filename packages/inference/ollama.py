@@ -39,6 +39,30 @@ class OllamaProvider:
         except TimeoutError as error:
             raise ModelProviderError("O Ollama demorou demais para carregar o modelo.") from error
 
+    def unload(self) -> None:
+        payload = json.dumps({"model": self._model, "keep_alive": 0}).encode("utf-8")
+        request = Request(
+            self._generate_url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        try:
+            with urlopen(request, timeout=self._timeout):
+                pass
+        except HTTPError as error:
+            detail = self._read_error_detail(error)
+            raise ModelProviderError(f"Ollama respondeu com erro {error.code}: {detail}") from error
+        except URLError as error:
+            raise ModelProviderError(
+                "Não foi possível conectar ao Ollama para descarregar o modelo."
+            ) from error
+        except TimeoutError as error:
+            raise ModelProviderError(
+                "O Ollama demorou demais para descarregar o modelo."
+            ) from error
+
     def generate(self, prompt: str) -> str:
         payload = json.dumps(
             {

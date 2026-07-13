@@ -82,3 +82,16 @@ def test_ollama_provider_warms_up_configured_model() -> None:
     request = urlopen_mock.call_args.args[0]
     assert request.full_url == "http://localhost:11434/api/generate"
     assert json.loads(request.data) == {"model": "test-model"}
+
+
+def test_ollama_provider_unloads_model_from_configured_server() -> None:
+    response = FakeHttpResponse(b"")
+
+    with patch("packages.inference.ollama.urlopen", return_value=response) as urlopen_mock:
+        provider = OllamaProvider(model="test-model", base_url="http://remote:11434")
+
+        provider.unload()
+
+    request = urlopen_mock.call_args.args[0]
+    assert request.full_url == "http://remote:11434/api/generate"
+    assert json.loads(request.data) == {"model": "test-model", "keep_alive": 0}
