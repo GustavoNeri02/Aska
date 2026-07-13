@@ -1,14 +1,15 @@
 import pytest
 
-from apps.cli.parser import (
+from apps.cli.command_parser import parse_input
+from apps.cli.commands import (
     ChatMessage,
     EditMemoryCommand,
     ExitCommand,
     ForgetMemoryCommand,
+    InvalidCommand,
     ListMemoriesCommand,
     RememberMemoryCommand,
     SearchMemoryCommand,
-    parse_input,
 )
 
 
@@ -26,7 +27,25 @@ def test_parser_returns_typed_memory_commands() -> None:
 
 
 def test_parser_marks_malformed_edit_command() -> None:
-    assert parse_input("editar memória: sem seta") == EditMemoryCommand("", "", is_malformed=True)
+    assert parse_input("editar memória: sem seta") == InvalidCommand(
+        "Use: editar memória: <atual> -> <novo>"
+    )
+
+
+@pytest.mark.parametrize(
+    ("user_input", "usage"),
+    [
+        ("lembrar:   ", "Use: lembrar: <conteúdo>"),
+        ("esquecer:   ", "Use: esquecer: <conteúdo>"),
+        ("buscar memória:   ", "Use: buscar memória: <termo>"),
+        (
+            "editar memória: atual ->   ",
+            "Informe a memória atual e o novo conteúdo.",
+        ),
+    ],
+)
+def test_parser_returns_guidance_for_invalid_commands(user_input: str, usage: str) -> None:
+    assert parse_input(user_input) == InvalidCommand(usage)
 
 
 def test_parser_preserves_regular_chat_message() -> None:

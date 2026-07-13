@@ -152,7 +152,7 @@ def test_atomic_write_preserves_file_and_cache_when_commit_fails(
         del source, destination
         raise OSError("falha simulada")
 
-    monkeypatch.setattr("packages.memory.json_data_source.os.replace", fail_atomic_replace)
+    monkeypatch.setattr("packages.memory.data.json_data_source.os.replace", fail_atomic_replace)
 
     with pytest.raises(MemoryRepositoryError, match="gravar"):
         memory_service.add("memória não persistida")

@@ -71,3 +71,20 @@ JsonMemoryDataSource
 ```
 
 `SqliteMemoryDataSource` continua `planned` e não foi criado neste incremento.
+
+## Organização do package
+
+```text
+packages/memory/
+├── domain/
+│   ├── model.py
+│   ├── repository.py
+│   └── service.py
+├── data/
+│   ├── local_data_source.py
+│   ├── local_repository.py
+│   └── json_data_source.py
+└── __init__.py
+```
+
+`domain` não depende de `data`. Cada camada possui seu próprio `__init__.py`, e o barrel raiz expõe a API pública completa para consumidores externos.

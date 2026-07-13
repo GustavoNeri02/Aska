@@ -1,21 +1,12 @@
 import os
 from collections.abc import Callable
 
-from apps.cli.parser import (
-    ChatMessage,
-    EditMemoryCommand,
-    ExitCommand,
-    ForgetMemoryCommand,
-    ListMemoriesCommand,
-    RememberMemoryCommand,
-    SearchMemoryCommand,
-    parse_input,
-)
+from apps.cli.command_parser import parse_input
+from apps.cli.commands import ChatMessage, ExitCommand, InvalidCommand, MemoryCommand
+from apps.cli.handlers import handle_memory_command
 from packages.conversation import ConversationService, ModelProvider, ModelProviderError
 from packages.inference import OllamaProvider
 from packages.memory import (
-    AddMemoryStatus,
-    EditMemoryStatus,
     JsonMemoryDataSource,
     LocalMemoryRepository,
     MemoryRepositoryError,
@@ -60,18 +51,13 @@ def run_conversation_loop(
         if isinstance(parsed_input, ExitCommand):
             output_writer("Até mais, Gustavo.")
             return
+        if isinstance(parsed_input, InvalidCommand):
+            output_writer(parsed_input.usage)
+            continue
 
         try:
-            if isinstance(parsed_input, ListMemoriesCommand):
-                _list_memories(memory_service, output_writer)
-            elif isinstance(parsed_input, RememberMemoryCommand):
-                _remember(parsed_input, memory_service, output_writer)
-            elif isinstance(parsed_input, ForgetMemoryCommand):
-                _forget(parsed_input, memory_service, output_writer)
-            elif isinstance(parsed_input, EditMemoryCommand):
-                _edit(parsed_input, memory_service, output_writer)
-            elif isinstance(parsed_input, SearchMemoryCommand):
-                _search(parsed_input, memory_service, output_writer)
+            if isinstance(parsed_input, MemoryCommand):
+                handle_memory_command(parsed_input, memory_service, output_writer)
             elif isinstance(parsed_input, ChatMessage):
                 response = conversation_service.send(parsed_input.content)
                 output_writer(f"Aska > {response}")
@@ -79,79 +65,6 @@ def run_conversation_loop(
             output_writer(f"Não foi possível acessar as memórias: {error}")
         except ModelProviderError as error:
             output_writer(f"Aska > {error}")
-
-
-def _list_memories(memory_service: MemoryService, output_writer: Callable[[str], None]) -> None:
-    memories = memory_service.list()
-    output_writer("Memórias locais:")
-    if not memories:
-        output_writer("(nenhuma memória registrada)")
-        return
-    for memory in memories:
-        output_writer(memory.content)
-
-
-def _remember(
-    command: RememberMemoryCommand,
-    memory_service: MemoryService,
-    output_writer: Callable[[str], None],
-) -> None:
-    if not command.content:
-        return
-    add_result = memory_service.add(command.content)
-    if add_result.status is AddMemoryStatus.ADDED:
-        output_writer("Memória registrada localmente.")
-    elif add_result.status is AddMemoryStatus.DUPLICATE:
-        output_writer("Já existe uma memória com esse conteúdo.")
-
-
-def _forget(
-    command: ForgetMemoryCommand,
-    memory_service: MemoryService,
-    output_writer: Callable[[str], None],
-) -> None:
-    if not command.content:
-        return
-    if memory_service.delete(command.content):
-        output_writer("Memória removida localmente.")
-    else:
-        output_writer("Nenhuma memória correspondente foi encontrada.")
-
-
-def _edit(
-    command: EditMemoryCommand,
-    memory_service: MemoryService,
-    output_writer: Callable[[str], None],
-) -> None:
-    if command.is_malformed:
-        output_writer("Use: editar memória: <atual> -> <novo>")
-        return
-    status = memory_service.edit(command.current_content, command.new_content)
-    status_messages = {
-        EditMemoryStatus.EDITED: "Memória editada localmente.",
-        EditMemoryStatus.NOT_FOUND: "Nenhuma memória correspondente foi encontrada.",
-        EditMemoryStatus.DUPLICATE: "Já existe uma memória com esse conteúdo.",
-        EditMemoryStatus.INVALID: "Informe a memória atual e o novo conteúdo.",
-        EditMemoryStatus.UNCHANGED: "A memória já possui esse conteúdo.",
-    }
-    output_writer(status_messages[status])
-
-
-def _search(
-    command: SearchMemoryCommand,
-    memory_service: MemoryService,
-    output_writer: Callable[[str], None],
-) -> None:
-    if not command.term:
-        output_writer("Use: buscar memória: <termo>")
-        return
-    matches = memory_service.search(command.term)
-    if not matches:
-        output_writer("Nenhuma memória encontrada para o termo.")
-        return
-    output_writer("Resultados da busca:")
-    for memory in matches:
-        output_writer(memory.content)
 
 
 def main() -> None:

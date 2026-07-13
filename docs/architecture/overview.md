@@ -44,6 +44,8 @@ O modelo é um componente usado pela conversa e pelo raciocínio, não o sistema
 
 O pacote `packages/conversation` concentra a orquestração da conversa, o histórico da sessão e a construção de contexto, sem depender do CLI. O CLI permanece como adaptador de entrada e saída e converte texto em comandos tipados.
 
+No CLI, `commands.py` define as intenções tipadas, `command_parser.py` converte texto nesses comandos e `handlers/memory.py` traduz comandos de memória em chamadas ao `MemoryService` e mensagens de saída. `app.py` mantém somente o loop, o despacho de alto nível e o composition root.
+
 O contrato `ModelProvider` pertence a `packages/conversation`, que é seu consumidor. O pacote `packages/inference` contém o primeiro adaptador, que usa a API HTTP local do Ollama. llama.cpp, LM Studio e vLLM continuam alternativas futuras. Gemini, ChatGPT e outras IAs externas podem ajudar no desenvolvimento, mas não são dependências de runtime.
 
 ## Monorepo
