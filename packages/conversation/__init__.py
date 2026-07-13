@@ -4,6 +4,7 @@ from packages.conversation.model import ConversationTurn, ModelMessage, ModelRol
 from packages.conversation.natural_memory import (
     AddMemoryIntent,
     DeleteMemoryIntent,
+    EditMemoryIntent,
     MemoryIntent,
     MemoryIntentInterpreter,
     ModelMemoryIntentInterpreter,
@@ -18,6 +19,7 @@ from packages.conversation.natural_memory import (
     find_name_memory_candidates,
     should_interpret_memory_add,
     should_interpret_memory_delete,
+    should_interpret_memory_edit,
     should_interpret_memory_intent,
     should_interpret_name_change,
 )
@@ -28,6 +30,7 @@ __all__ = [
     "ASKA_IDENTITY",
     "AddMemoryIntent",
     "DeleteMemoryIntent",
+    "EditMemoryIntent",
     "ContextBuilder",
     "ConversationService",
     "ConversationTurn",
@@ -49,6 +52,7 @@ __all__ = [
     "find_name_memory_candidates",
     "should_interpret_memory_add",
     "should_interpret_memory_delete",
+    "should_interpret_memory_edit",
     "should_interpret_name_change",
     "should_interpret_memory_intent",
 ]

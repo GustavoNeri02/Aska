@@ -6,6 +6,7 @@ from apps.cli.app import run_conversation_loop
 from packages.conversation import (
     AddMemoryIntent,
     DeleteMemoryIntent,
+    EditMemoryIntent,
     ModelMemoryIntentInterpreter,
     NameUpdateIntent,
 )
@@ -1340,6 +1341,264 @@ def test_memory_delete_interpretation_does_not_enter_history(tmp_path: Path) -> 
         provider,
         memory_intent_interpreter=interpreter,
         input_reader=create_input_reader(["Remova a memória sobre Flutter.", "não", "Olá", "sair"]),
+        output_writer=lambda output: None,
+        memory_service=store,
+    )
+
+    assert len(provider.messages) == 1
+    assert [message.content for message in provider.messages[0][1:]] == ["Olá"]
+
+
+def test_generic_memory_edit_proposes_without_persisting(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(
+        EditMemoryIntent("Flutter", "Eu trabalho com Python.")
+    )
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+    message = "Atualize a memória sobre Flutter: agora eu trabalho com Python."
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: editar memória" in output
+    assert "Conteúdo atual: Eu trabalho com Flutter." in output
+    assert "Novo conteúdo: Eu trabalho com Python." in output
+    assert store.list() == [original]
+    assert interpreter.inputs == [message]
+
+
+def test_generic_memory_edit_confirmation_executes_only_once(tmp_path: Path) -> None:
+    output: list[str] = []
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(
+        EditMemoryIntent("Flutter", "Eu trabalho com Python.")
+    )
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+    assert original is not None
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["Atualize a memória sobre Flutter: agora uso Python.", "sim", "confirmo", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    edited = store.list()[0]
+    assert edited.content == "Eu trabalho com Python."
+    assert edited.id == original.id
+    assert output.count("Memória editada localmente.") == 1
+    assert provider.messages[0][-1].content == "confirmo"
+
+
+def test_generic_memory_edit_cancellation_preserves_memory(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(
+        EditMemoryIntent("respostas longas", "Prefiro respostas curtas.")
+    )
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Prefiro respostas longas.").memory
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["Corrija a memória que diz que prefiro respostas longas.", "cancelar", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Edição de memória cancelada." in output
+    assert store.list() == [original]
+
+
+def test_generic_memory_edit_exact_match_precedes_partial_matches(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(EditMemoryIntent("Flutter", "Python"))
+    store = create_temp_memory_service(tmp_path)
+    exact = store.add("Flutter").memory
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Atualize a memória sobre Flutter.", "sim", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Conteúdo atual: Flutter" in output
+    assert [memory.content for memory in store.list()] == ["Python", "Eu trabalho com Flutter."]
+    assert exact is not None
+
+
+def test_generic_memory_edit_uses_partial_search_for_single_candidate(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(
+        EditMemoryIntent("tema claro", "Prefiro tema escuro.")
+    )
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Prefiro tema claro.").memory
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Troque minha preferência de tema.", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Conteúdo atual: Prefiro tema claro." in output
+    assert store.list() == [original]
+
+
+@pytest.mark.parametrize("candidate_count", [0, 2])
+def test_generic_memory_edit_requires_exactly_one_candidate(
+    candidate_count: int,
+    tmp_path: Path,
+) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(EditMemoryIntent("Flutter", "Uso Python."))
+    store = create_temp_memory_service(tmp_path)
+    if candidate_count == 2:
+        store.add("Eu trabalho com Flutter.")
+        store.add("Eu estudo Flutter.")
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Atualize a memória sobre Flutter.", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: editar memória" not in output
+    assert len(store.list()) == candidate_count
+    if candidate_count == 0:
+        assert "Nenhuma memória correspondente foi encontrada." in output
+    else:
+        assert any("mais de uma memória correspondente" in message for message in output)
+
+
+def test_generic_memory_edit_snapshot_conflict_prevents_change(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(
+        EditMemoryIntent("Flutter", "Eu trabalho com Python.")
+    )
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+    assert original is not None
+    messages = iter(["Atualize a memória sobre Flutter.", "sim", "sair"])
+
+    def input_reader(_: str) -> str:
+        message = next(messages)
+        if message == "sim":
+            store.edit(original.content, "Eu trabalho com Dart.")
+        return message
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=input_reader,
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert any("mudou desde a proposta" in message for message in output)
+    assert store.list()[0].content == "Eu trabalho com Dart."
+
+
+@pytest.mark.parametrize(
+    ("new_content", "expected_message"),
+    [
+        ("Uso Python.", "Já existe uma memória com o novo conteúdo."),
+        ("Eu trabalho com Flutter.", "A memória já possui o conteúdo proposto."),
+    ],
+)
+def test_generic_memory_edit_reports_duplicate_or_unchanged(
+    new_content: str,
+    expected_message: str,
+    tmp_path: Path,
+) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(EditMemoryIntent("Flutter", new_content))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+    duplicate = store.add(new_content).memory if new_content == "Uso Python." else None
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Atualize a memória sobre Flutter.", "sim", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert expected_message in output
+    assert store.list() == ([original, duplicate] if duplicate is not None else [original])
+
+
+def test_generic_edit_gate_rejects_incompatible_intent(tmp_path: Path) -> None:
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Informação inventada."))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+    message = "Atualize a memória sobre Flutter."
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=lambda output: None,
+        memory_service=store,
+    )
+
+    assert store.list() == [original]
+    assert provider.messages[0][-1].content == message
+
+
+def test_name_gate_precedes_generic_memory_edit_gate(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(NameUpdateIntent("Gustavo Neri"))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Meu nome é Gustavo.").memory
+    message = "Atualize a memória do meu nome para Gustavo Neri."
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Novo conteúdo: Meu nome é Gustavo Neri." in output
+    assert store.list() == [original]
+
+
+def test_generic_memory_edit_interpretation_does_not_enter_history(tmp_path: Path) -> None:
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(
+        EditMemoryIntent("Flutter", "Eu trabalho com Python.")
+    )
+    store = create_temp_memory_service(tmp_path)
+    store.add("Eu trabalho com Flutter.")
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(
+            ["Atualize a memória sobre Flutter.", "não", "Olá", "sair"]
+        ),
         output_writer=lambda output: None,
         memory_service=store,
     )

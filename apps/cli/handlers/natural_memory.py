@@ -3,6 +3,7 @@ from collections.abc import Callable
 from packages.conversation import (
     AddMemoryIntent,
     DeleteMemoryIntent,
+    EditMemoryIntent,
     MemoryIntentInterpreter,
     NameUpdateIntent,
     PendingMemoryAdd,
@@ -15,6 +16,7 @@ from packages.conversation import (
     find_name_memory_candidates,
     should_interpret_memory_add,
     should_interpret_memory_delete,
+    should_interpret_memory_edit,
     should_interpret_name_change,
 )
 from packages.memory import (
@@ -22,6 +24,7 @@ from packages.memory import (
     AddMemoryStatus,
     DeleteMemoryStatus,
     EditMemoryStatus,
+    Memory,
     MemoryService,
 )
 
@@ -46,6 +49,7 @@ class NaturalMemoryHandler:
         new_content = detect_name_change(user_input)
         name_gate = should_interpret_name_change(user_input)
         delete_gate = should_interpret_memory_delete(user_input)
+        edit_gate = should_interpret_memory_edit(user_input)
         add_gate = should_interpret_memory_add(user_input)
         deterministic_delete = detect_memory_delete(user_input)
         deterministic_add = detect_memory_add(user_input)
@@ -57,6 +61,7 @@ class NaturalMemoryHandler:
             new_content is None
             and not name_gate
             and not delete_gate
+            and not edit_gate
             and deterministic_add is not None
         ):
             self._pending = PendingMemoryAdd(deterministic_add.content)
@@ -66,7 +71,7 @@ class NaturalMemoryHandler:
         if (
             new_content is None
             and self._memory_intent_interpreter is not None
-            and (name_gate or delete_gate or add_gate)
+            and (name_gate or delete_gate or edit_gate or add_gate)
         ):
             intent = self._memory_intent_interpreter.interpret(user_input)
             if name_gate and isinstance(intent, NameUpdateIntent):
@@ -77,6 +82,15 @@ class NaturalMemoryHandler:
             elif (
                 not name_gate
                 and not delete_gate
+                and edit_gate
+                and isinstance(intent, EditMemoryIntent)
+            ):
+                self._propose_edit(intent.query, intent.new_content)
+                return True
+            elif (
+                not name_gate
+                and not delete_gate
+                and not edit_gate
                 and add_gate
                 and isinstance(intent, AddMemoryIntent)
             ):
@@ -160,20 +174,8 @@ class NaturalMemoryHandler:
         present_memory_edit_proposal(self._pending, self._output_writer)
 
     def _propose_delete(self, query: str) -> None:
-        exact_candidates = [
-            memory
-            for memory in self._memory_service.list()
-            if memory.content.casefold() == query.casefold()
-        ]
-        candidates = exact_candidates or self._memory_service.search(query)
-        if not candidates:
-            self._output_writer("Nenhuma memória correspondente foi encontrada.")
-            return
-        if len(candidates) > 1:
-            self._output_writer(
-                "Encontrei mais de uma memória correspondente. "
-                "Nenhuma foi escolhida automaticamente."
-            )
+        candidates = self._find_candidates(query)
+        if candidates is None:
             return
 
         candidate = candidates[0]
@@ -182,6 +184,37 @@ class NaturalMemoryHandler:
             expected_content=candidate.content,
         )
         present_memory_delete_proposal(self._pending, self._output_writer)
+
+    def _propose_edit(self, query: str, new_content: str) -> None:
+        candidates = self._find_candidates(query)
+        if candidates is None:
+            return
+
+        candidate = candidates[0]
+        self._pending = PendingMemoryEdit(
+            memory_id=candidate.id,
+            expected_content=candidate.content,
+            new_content=new_content,
+        )
+        present_memory_edit_proposal(self._pending, self._output_writer)
+
+    def _find_candidates(self, query: str) -> list[Memory] | None:
+        exact_candidates = [
+            memory
+            for memory in self._memory_service.list()
+            if memory.content.casefold() == query.casefold()
+        ]
+        candidates = exact_candidates or self._memory_service.search(query)
+        if not candidates:
+            self._output_writer("Nenhuma memória correspondente foi encontrada.")
+            return None
+        if len(candidates) > 1:
+            self._output_writer(
+                "Encontrei mais de uma memória correspondente. "
+                "Nenhuma foi escolhida automaticamente."
+            )
+            return None
+        return candidates
 
 
 def present_memory_add_proposal(

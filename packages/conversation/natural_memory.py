@@ -53,15 +53,28 @@ _MEMORY_DELETE_GATE_TERMS = (
     re.compile(r"\bnão\s+precisa\s+mais\s+lembrar\b.*\bque\b\s+\S", re.IGNORECASE),
     re.compile(r"\bapag\w*\b.*\bguard\w*\b.*\S", re.IGNORECASE),
 )
+_MEMORY_EDIT_GATE_TERMS = (
+    re.compile(
+        r"\b(?:atualize|corrija|altere|troque|mude|edite)\b.*"
+        r"\b(?:memória|informação|preferência)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:memória|informação|preferência)\b.*\bmudou\b\s*:",
+        re.IGNORECASE,
+    ),
+)
 _INTERPRETER_INSTRUCTION = """Classifique somente se a mensagem pede explicitamente para:
 - alterar o nome de Gustavo; ou
 - guardar uma única informação como memória; ou
-- excluir uma memória descrita pelo usuário.
+- excluir uma memória descrita pelo usuário; ou
+- editar uma memória descrita pelo usuário.
 Responda com exatamente um objeto JSON, sem Markdown ou texto adicional.
 Formatos permitidos:
 {"action":"update_name","new_name":"Novo Nome"}
 {"action":"add_memory","content":"Informação a guardar."}
 {"action":"delete_memory","query":"Informação a localizar."}
+{"action":"edit_memory","query":"Informação atual.","new_content":"Nova informação."}
 {"action":"none"}
 Preserve o significado e negações da informação original.
 Não execute ações, não informe sucesso e não invente informações."""
@@ -100,7 +113,13 @@ class DeleteMemoryIntent:
     query: str
 
 
-type MemoryIntent = NameUpdateIntent | AddMemoryIntent | DeleteMemoryIntent
+@dataclass(frozen=True, slots=True)
+class EditMemoryIntent:
+    query: str
+    new_content: str
+
+
+type MemoryIntent = NameUpdateIntent | AddMemoryIntent | DeleteMemoryIntent | EditMemoryIntent
 
 
 class MemoryIntentInterpreter(Protocol):
@@ -181,11 +200,19 @@ def should_interpret_memory_delete(user_input: str) -> bool:
     return any(pattern.search(message) for pattern in patterns)
 
 
+def should_interpret_memory_edit(user_input: str) -> bool:
+    message = user_input.strip()
+    if "\n" in message or "\r" in message:
+        return False
+    return any(pattern.search(message) for pattern in _MEMORY_EDIT_GATE_TERMS)
+
+
 def should_interpret_memory_intent(user_input: str) -> bool:
     return (
         should_interpret_name_change(user_input)
         or should_interpret_memory_add(user_input)
         or should_interpret_memory_delete(user_input)
+        or should_interpret_memory_edit(user_input)
     )
 
 
@@ -234,6 +261,27 @@ def _parse_interpretation(response: str) -> MemoryIntent | None:
         if not normalized_query or "\n" in normalized_query or "\r" in normalized_query:
             return None
         return DeleteMemoryIntent(normalized_query)
+
+    if action == "edit_memory":
+        if set(data) != {"action", "query", "new_content"}:
+            return None
+        query = data.get("query")
+        new_content = data.get("new_content")
+        if not isinstance(query, str) or not isinstance(new_content, str):
+            return None
+        normalized_query = query.strip()
+        normalized_content = new_content.strip()
+        if (
+            not normalized_query
+            or not normalized_content
+            or "\n" in normalized_query
+            or "\r" in normalized_query
+            or "\n" in normalized_content
+            or "\r" in normalized_content
+            or normalized_query.casefold() == normalized_content.casefold()
+        ):
+            return None
+        return EditMemoryIntent(normalized_query, normalized_content)
 
     if action != "update_name" or set(data) != {"action", "new_name"}:
         return None

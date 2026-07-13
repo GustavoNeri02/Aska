@@ -6,6 +6,7 @@ import pytest
 from packages.conversation import (
     AddMemoryIntent,
     DeleteMemoryIntent,
+    EditMemoryIntent,
     ModelMemoryIntentInterpreter,
     ModelMessage,
     NameUpdateIntent,
@@ -15,6 +16,7 @@ from packages.conversation import (
     find_name_memory_candidates,
     should_interpret_memory_add,
     should_interpret_memory_delete,
+    should_interpret_memory_edit,
     should_interpret_memory_intent,
     should_interpret_name_change,
 )
@@ -166,6 +168,33 @@ def test_memory_delete_gate_does_not_capture_explicit_memory_add() -> None:
     assert should_interpret_memory_delete(message) is False
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Atualize a memória sobre Flutter: agora eu trabalho com Python.",
+        "Corrija a memória que diz que prefiro respostas longas; prefiro respostas curtas.",
+        "Troque minha preferência por tema claro para tema escuro.",
+        "A informação sobre meu projeto antigo mudou: agora o projeto principal é o Aska.",
+    ],
+)
+def test_memory_edit_gate_accepts_explicit_memory_changes(message: str) -> None:
+    assert should_interpret_memory_edit(message) is True
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Atualize meu aplicativo.",
+        "Corrija este código.",
+        "Mude de assunto.",
+        "O que mudou nas minhas memórias?",
+        "Qual é minha preferência atual?",
+    ],
+)
+def test_memory_edit_gate_rejects_common_or_insufficient_requests(message: str) -> None:
+    assert should_interpret_memory_edit(message) is False
+
+
 def test_find_name_memory_candidates_uses_restricted_text_patterns() -> None:
     now = datetime(2026, 7, 13, tzinfo=UTC)
     memories = [
@@ -274,6 +303,20 @@ def test_model_interpreter_returns_typed_memory_delete() -> None:
     assert result == DeleteMemoryIntent("trabalho com Flutter")
 
 
+def test_model_interpreter_returns_typed_memory_edit() -> None:
+    provider = StaticProvider(
+        '{"action":"edit_memory","query":"trabalho com Flutter",'
+        '"new_content":"Eu trabalho com Python."}'
+    )
+    interpreter = ModelMemoryIntentInterpreter(provider)
+
+    result = interpreter.interpret(
+        "Atualize a memória sobre Flutter: agora eu trabalho com Python."
+    )
+
+    assert result == EditMemoryIntent("trabalho com Flutter", "Eu trabalho com Python.")
+
+
 @pytest.mark.parametrize(
     "response",
     [
@@ -306,6 +349,28 @@ def test_model_interpreter_rejects_invalid_memory_delete(response: str) -> None:
     interpreter = ModelMemoryIntentInterpreter(StaticProvider(response))
 
     assert interpreter.interpret("Remova a memória sobre Flutter.") is None
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        '```json\n{"action":"edit_memory","query":"Flutter","new_content":"Python"}\n```',
+        '{"action":"edit_memory","query":"Flutter","new_content":"Python","extra":true}',
+        '{"action":"edit_memory","query":"","new_content":"Python"}',
+        '{"action":"edit_memory","query":"Flutter","new_content":""}',
+        '{"action":"edit_memory","query":42,"new_content":"Python"}',
+        '{"action":"edit_memory","query":"Flutter","new_content":42}',
+        '{"action":"edit_memory","query":"Flutter\nDart","new_content":"Python"}',
+        '{"action":"edit_memory","query":"Flutter","new_content":"Python\nDart"}',
+        '{"action":"edit_memory","query":" Flutter ","new_content":"flutter"}',
+        '{"action":"unknown","query":"Flutter","new_content":"Python"}',
+        "not-json",
+    ],
+)
+def test_model_interpreter_rejects_invalid_memory_edit(response: str) -> None:
+    interpreter = ModelMemoryIntentInterpreter(StaticProvider(response))
+
+    assert interpreter.interpret("Atualize a memória sobre Flutter.") is None
 
 
 @pytest.mark.parametrize(
