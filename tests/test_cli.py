@@ -1,4 +1,5 @@
 from collections.abc import Callable, Iterator
+from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from apps.cli.app import (
     main,
     run_conversation_loop,
 )
+from apps.cli.loading import run_with_loading
 from packages.conversation import ModelProviderError
 from packages.memory import (
     EditMemoryStatus,
@@ -82,10 +84,20 @@ def test_build_banner_contains_application_name() -> None:
     assert "Aska" in banner
 
 
+def test_loading_displays_message_and_clears_line() -> None:
+    output = StringIO()
+
+    run_with_loading(lambda: None, "Carregando modelo...", stream=output)
+
+    assert output.getvalue() == "| Carregando modelo...\r\033[K"
+
+
 def test_main_stops_configured_ollama_model_on_exit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ASKA_MODEL", "custom-model")
+    monkeypatch.setattr("apps.cli.app.OllamaProvider.warm_up", lambda self: None)
+    monkeypatch.setattr("apps.cli.app.run_with_loading", lambda action, message: action())
     monkeypatch.setattr("apps.cli.app.run_conversation_loop", lambda *args, **kwargs: None)
     commands: list[tuple[list[str], bool]] = []
 
@@ -106,6 +118,8 @@ def test_main_stops_ollama_model_when_conversation_fails(
         raise RuntimeError("unexpected failure")
 
     commands: list[list[str]] = []
+    monkeypatch.setattr("apps.cli.app.OllamaProvider.warm_up", lambda self: None)
+    monkeypatch.setattr("apps.cli.app.run_with_loading", lambda action, message: action())
     monkeypatch.setattr("apps.cli.app.run_conversation_loop", fail)
     monkeypatch.setattr(
         "apps.cli.app.subprocess.run",
@@ -116,6 +130,30 @@ def test_main_stops_ollama_model_when_conversation_fails(
         main()
 
     assert commands == [["ollama", "stop", "gemma3:12b"]]
+
+
+def test_main_reports_ollama_warm_up_error_and_does_not_start_conversation(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail_warm_up(self: object) -> None:
+        raise ModelProviderError("Modelo indisponível")
+
+    conversation_started = False
+
+    def start_conversation(*args: object, **kwargs: object) -> None:
+        nonlocal conversation_started
+        conversation_started = True
+
+    monkeypatch.setattr("apps.cli.app.OllamaProvider.warm_up", fail_warm_up)
+    monkeypatch.setattr("apps.cli.app.run_with_loading", lambda action, message: action())
+    monkeypatch.setattr("apps.cli.app.run_conversation_loop", start_conversation)
+    monkeypatch.setattr("apps.cli.app.subprocess.run", lambda command, check: None)
+
+    main()
+
+    assert "Aska > Modelo indisponível" in capsys.readouterr().out
+    assert conversation_started is False
 
 
 def test_conversation_sends_message_to_provider(tmp_path: Path) -> None:

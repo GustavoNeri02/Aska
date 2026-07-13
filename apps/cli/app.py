@@ -6,6 +6,7 @@ from contextlib import suppress
 from apps.cli.command_parser import parse_input
 from apps.cli.commands import ChatMessage, ExitCommand, InvalidCommand, MemoryCommand
 from apps.cli.handlers import handle_memory_command
+from apps.cli.loading import run_with_loading
 from packages.conversation import ConversationService, ModelProvider, ModelProviderError
 from packages.inference import OllamaProvider
 from packages.memory import (
@@ -80,6 +81,11 @@ def main() -> None:
     memory_service = MemoryService(memory_repository)
 
     try:
+        try:
+            run_with_loading(model_provider.warm_up, f"Carregando {model}...")
+        except ModelProviderError as error:
+            print(f"Aska > {error}")
+            return
         run_conversation_loop(model_provider, memory_service=memory_service)
     finally:
         with suppress(OSError):

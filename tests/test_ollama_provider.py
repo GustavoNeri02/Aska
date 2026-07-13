@@ -69,3 +69,16 @@ def test_ollama_provider_rejects_invalid_response() -> None:
 
         with pytest.raises(ModelProviderError, match="resposta inválida"):
             provider.generate("Olá")
+
+
+def test_ollama_provider_warms_up_configured_model() -> None:
+    response = FakeHttpResponse(b"")
+
+    with patch("packages.inference.ollama.urlopen", return_value=response) as urlopen_mock:
+        provider = OllamaProvider(model="test-model")
+
+        provider.warm_up()
+
+    request = urlopen_mock.call_args.args[0]
+    assert request.full_url == "http://localhost:11434/api/generate"
+    assert json.loads(request.data) == {"model": "test-model"}
