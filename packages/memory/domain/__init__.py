@@ -3,6 +3,7 @@ from packages.memory.domain.repository import MemoryRepository, MemoryRepository
 from packages.memory.domain.service import (
     AddMemoryResult,
     AddMemoryStatus,
+    DeleteMemoryStatus,
     EditMemoryStatus,
     MemoryService,
 )
@@ -10,6 +11,7 @@ from packages.memory.domain.service import (
 __all__ = [
     "AddMemoryResult",
     "AddMemoryStatus",
+    "DeleteMemoryStatus",
     "EditMemoryStatus",
     "Memory",
     "MemoryRepository",

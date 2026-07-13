@@ -18,6 +18,11 @@ _MEMORY_ADD_PATTERNS = (
     re.compile(r"guarde\s+que\s*(.*)", re.IGNORECASE),
     re.compile(r"não\s+esqueça\s+que\s*(.*)", re.IGNORECASE),
 )
+_MEMORY_DELETE_PATTERNS = (
+    re.compile(r"esqueça\s+que\s*(.*)", re.IGNORECASE),
+    re.compile(r"remova\s+a\s+memória\s*:\s*(.*)", re.IGNORECASE),
+    re.compile(r"apague\s+a\s+memória\s*:\s*(.*)", re.IGNORECASE),
+)
 _NAME_COMPONENT = r"[^\W\d_]+(?:[-'’][^\W\d_]+)?"
 _NAME = re.compile(rf"{_NAME_COMPONENT}(?:\s+{_NAME_COMPONENT})*", re.UNICODE)
 _AMBIGUOUS_WORDS = frozenset({"e", "mas", "porque", "porém", "pois", "também"})
@@ -38,13 +43,25 @@ _MEMORY_ADD_GATE_TERMS = (
     ),
     re.compile(r"\bnão\s+esqueça\b.*\bque\b\s+\S", re.IGNORECASE),
 )
+_MEMORY_DELETE_GATE_TERMS = (
+    re.compile(r"\besqueça\b\s+que\b\s+\S", re.IGNORECASE),
+    re.compile(
+        r"\b(?:remov\w*|apag\w*|exclu\w*)\b.*\bmemória\b"
+        r"(?:\s*:|\s+(?:sobre|de))?\s+\S",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bnão\s+precisa\s+mais\s+lembrar\b.*\bque\b\s+\S", re.IGNORECASE),
+    re.compile(r"\bapag\w*\b.*\bguard\w*\b.*\S", re.IGNORECASE),
+)
 _INTERPRETER_INSTRUCTION = """Classifique somente se a mensagem pede explicitamente para:
 - alterar o nome de Gustavo; ou
-- guardar uma única informação como memória.
+- guardar uma única informação como memória; ou
+- excluir uma memória descrita pelo usuário.
 Responda com exatamente um objeto JSON, sem Markdown ou texto adicional.
 Formatos permitidos:
 {"action":"update_name","new_name":"Novo Nome"}
 {"action":"add_memory","content":"Informação a guardar."}
+{"action":"delete_memory","query":"Informação a localizar."}
 {"action":"none"}
 Preserve o significado e negações da informação original.
 Não execute ações, não informe sucesso e não invente informações."""
@@ -63,6 +80,12 @@ class PendingMemoryAdd:
 
 
 @dataclass(frozen=True, slots=True)
+class PendingMemoryDelete:
+    memory_id: str
+    expected_content: str
+
+
+@dataclass(frozen=True, slots=True)
 class NameUpdateIntent:
     new_name: str
 
@@ -72,7 +95,12 @@ class AddMemoryIntent:
     content: str
 
 
-type MemoryIntent = NameUpdateIntent | AddMemoryIntent
+@dataclass(frozen=True, slots=True)
+class DeleteMemoryIntent:
+    query: str
+
+
+type MemoryIntent = NameUpdateIntent | AddMemoryIntent | DeleteMemoryIntent
 
 
 class MemoryIntentInterpreter(Protocol):
@@ -118,6 +146,19 @@ def detect_memory_add(user_input: str) -> AddMemoryIntent | None:
     return None
 
 
+def detect_memory_delete(user_input: str) -> DeleteMemoryIntent | None:
+    message = user_input.strip()
+    if "\n" in message or "\r" in message:
+        return None
+    for pattern in _MEMORY_DELETE_PATTERNS:
+        match = pattern.fullmatch(message)
+        if match is None:
+            continue
+        query = match.group(1).strip()
+        return DeleteMemoryIntent(query) if query else None
+    return None
+
+
 def should_interpret_name_change(user_input: str) -> bool:
     message = user_input.strip()
     return any(pattern.search(message) for pattern in _NAME_CHANGE_GATE_TERMS)
@@ -130,8 +171,22 @@ def should_interpret_memory_add(user_input: str) -> bool:
     return any(pattern.search(message) for pattern in _MEMORY_ADD_GATE_TERMS)
 
 
+def should_interpret_memory_delete(user_input: str) -> bool:
+    message = user_input.strip()
+    if "\n" in message or "\r" in message:
+        return False
+    patterns = _MEMORY_DELETE_GATE_TERMS
+    if re.search(r"\bnão\s+esqueça\b", message, re.IGNORECASE):
+        patterns = patterns[1:]
+    return any(pattern.search(message) for pattern in patterns)
+
+
 def should_interpret_memory_intent(user_input: str) -> bool:
-    return should_interpret_name_change(user_input) or should_interpret_memory_add(user_input)
+    return (
+        should_interpret_name_change(user_input)
+        or should_interpret_memory_add(user_input)
+        or should_interpret_memory_delete(user_input)
+    )
 
 
 def canonical_name_memory(new_name: str) -> str:
@@ -168,6 +223,17 @@ def _parse_interpretation(response: str) -> MemoryIntent | None:
         if not normalized_content or "\n" in normalized_content or "\r" in normalized_content:
             return None
         return AddMemoryIntent(normalized_content)
+
+    if action == "delete_memory":
+        if set(data) != {"action", "query"}:
+            return None
+        query = data.get("query")
+        if not isinstance(query, str):
+            return None
+        normalized_query = query.strip()
+        if not normalized_query or "\n" in normalized_query or "\r" in normalized_query:
+            return None
+        return DeleteMemoryIntent(normalized_query)
 
     if action != "update_name" or set(data) != {"action", "new_name"}:
         return None

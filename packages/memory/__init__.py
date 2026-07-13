@@ -7,6 +7,7 @@ from packages.memory.data import (
 from packages.memory.domain import (
     AddMemoryResult,
     AddMemoryStatus,
+    DeleteMemoryStatus,
     EditMemoryStatus,
     Memory,
     MemoryRepository,
@@ -18,6 +19,7 @@ from packages.memory.domain import (
 __all__ = [
     "AddMemoryResult",
     "AddMemoryStatus",
+    "DeleteMemoryStatus",
     "EditMemoryStatus",
     "JsonMemoryDataSource",
     "LocalMemoryRepository",

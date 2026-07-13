@@ -8,6 +8,8 @@ from apps.cli.handlers import (
     handle_memory_command,
     present_memory_add_proposal,
     present_memory_add_result,
+    present_memory_delete_proposal,
+    present_memory_delete_result,
     present_memory_edit_proposal,
     present_memory_edit_result,
 )
@@ -15,18 +17,22 @@ from apps.cli.loading import run_with_loading
 from packages.conversation import (
     AddMemoryIntent,
     ConversationService,
+    DeleteMemoryIntent,
     MemoryIntentInterpreter,
     ModelMemoryIntentInterpreter,
     ModelProvider,
     ModelProviderError,
     NameUpdateIntent,
     PendingMemoryAdd,
+    PendingMemoryDelete,
     PendingMemoryEdit,
     canonical_name_memory,
     detect_memory_add,
+    detect_memory_delete,
     detect_name_change,
     find_name_memory_candidates,
     should_interpret_memory_add,
+    should_interpret_memory_delete,
     should_interpret_name_change,
 )
 from packages.inference import OllamaProvider
@@ -61,7 +67,7 @@ def run_conversation_loop(
     output_writer("Digite 'sair' para encerrar.")
     output_writer("")
     conversation_service = ConversationService(model_provider, memory_service)
-    pending_memory_action: PendingMemoryAdd | PendingMemoryEdit | None = None
+    pending_memory_action: PendingMemoryAdd | PendingMemoryDelete | PendingMemoryEdit | None = None
 
     while True:
         try:
@@ -88,6 +94,8 @@ def run_conversation_loop(
                     pending_memory_action = None
                     if isinstance(cancelled_action, PendingMemoryEdit):
                         output_writer("Proposta de edição anterior cancelada.")
+                    elif isinstance(cancelled_action, PendingMemoryDelete):
+                        output_writer("Proposta de exclusão anterior cancelada.")
                     else:
                         output_writer("Proposta de inclusão anterior cancelada.")
                 handle_memory_command(parsed_input, memory_service, output_writer)
@@ -104,6 +112,12 @@ def run_conversation_loop(
                                 confirmed_action.new_content,
                             )
                             present_memory_edit_result(status, output_writer)
+                        elif isinstance(confirmed_action, PendingMemoryDelete):
+                            status = memory_service.delete_by_id(
+                                confirmed_action.memory_id,
+                                confirmed_action.expected_content,
+                            )
+                            present_memory_delete_result(status, output_writer)
                         else:
                             result = memory_service.add(confirmed_action.content)
                             present_memory_add_result(result, output_writer)
@@ -112,6 +126,8 @@ def run_conversation_loop(
                         pending_memory_action = None
                         if isinstance(cancelled_action, PendingMemoryEdit):
                             output_writer("Edição de memória cancelada.")
+                        elif isinstance(cancelled_action, PendingMemoryDelete):
+                            output_writer("Exclusão de memória cancelada.")
                         else:
                             output_writer("Inclusão de memória cancelada.")
                     else:
@@ -123,21 +139,47 @@ def run_conversation_loop(
 
                 new_content = detect_name_change(parsed_input.content)
                 name_gate = should_interpret_name_change(parsed_input.content)
+                delete_gate = should_interpret_memory_delete(parsed_input.content)
                 add_gate = should_interpret_memory_add(parsed_input.content)
+                deterministic_delete = detect_memory_delete(parsed_input.content)
                 deterministic_add = detect_memory_add(parsed_input.content)
-                if new_content is None and not name_gate and deterministic_add is not None:
+                if new_content is None and not name_gate and deterministic_delete is not None:
+                    pending_memory_action = _propose_memory_delete(
+                        deterministic_delete.query,
+                        memory_service,
+                        output_writer,
+                    )
+                    continue
+                if (
+                    new_content is None
+                    and not name_gate
+                    and not delete_gate
+                    and deterministic_add is not None
+                ):
                     pending_memory_action = PendingMemoryAdd(deterministic_add.content)
                     present_memory_add_proposal(pending_memory_action, output_writer)
                     continue
                 if (
                     new_content is None
                     and memory_intent_interpreter is not None
-                    and (name_gate or add_gate)
+                    and (name_gate or delete_gate or add_gate)
                 ):
                     intent = memory_intent_interpreter.interpret(parsed_input.content)
                     if name_gate and isinstance(intent, NameUpdateIntent):
                         new_content = canonical_name_memory(intent.new_name)
-                    elif not name_gate and add_gate and isinstance(intent, AddMemoryIntent):
+                    elif not name_gate and delete_gate and isinstance(intent, DeleteMemoryIntent):
+                        pending_memory_action = _propose_memory_delete(
+                            intent.query,
+                            memory_service,
+                            output_writer,
+                        )
+                        continue
+                    elif (
+                        not name_gate
+                        and not delete_gate
+                        and add_gate
+                        and isinstance(intent, AddMemoryIntent)
+                    ):
                         pending_memory_action = PendingMemoryAdd(intent.content)
                         present_memory_add_proposal(pending_memory_action, output_writer)
                         continue
@@ -166,6 +208,33 @@ def run_conversation_loop(
             output_writer(f"Não foi possível acessar as memórias: {error}")
         except ModelProviderError as error:
             output_writer(f"Aska > {error}")
+
+
+def _propose_memory_delete(
+    query: str,
+    memory_service: MemoryService,
+    output_writer: Callable[[str], None],
+) -> PendingMemoryDelete | None:
+    exact_candidates = [
+        memory for memory in memory_service.list() if memory.content.casefold() == query.casefold()
+    ]
+    candidates = exact_candidates or memory_service.search(query)
+    if not candidates:
+        output_writer("Nenhuma memória correspondente foi encontrada.")
+        return None
+    if len(candidates) > 1:
+        output_writer(
+            "Encontrei mais de uma memória correspondente. Nenhuma foi escolhida automaticamente."
+        )
+        return None
+
+    candidate = candidates[0]
+    pending_delete = PendingMemoryDelete(
+        memory_id=candidate.id,
+        expected_content=candidate.content,
+    )
+    present_memory_delete_proposal(pending_delete, output_writer)
+    return pending_delete
 
 
 def main() -> None:

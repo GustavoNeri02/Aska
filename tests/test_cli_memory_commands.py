@@ -5,6 +5,7 @@ import pytest
 from apps.cli.app import run_conversation_loop
 from packages.conversation import (
     AddMemoryIntent,
+    DeleteMemoryIntent,
     ModelMemoryIntentInterpreter,
     NameUpdateIntent,
 )
@@ -1060,3 +1061,288 @@ def test_compatible_name_intent_still_creates_edit_proposal(tmp_path: Path) -> N
 
     assert "Ação proposta: editar memória" in output
     assert store.list() == [original]
+
+
+def test_deterministic_memory_delete_proposes_without_interpreter_or_persistence(
+    tmp_path: Path,
+) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(DeleteMemoryIntent("não utilizado"))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("eu trabalho com Flutter.").memory
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Esqueça que eu trabalho com Flutter.", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: excluir memória" in output
+    assert "Conteúdo: eu trabalho com Flutter." in output
+    assert store.list() == [original]
+    assert interpreter.inputs == []
+
+
+def test_interpreted_memory_delete_paraphrase_creates_proposal(tmp_path: Path) -> None:
+    output: list[str] = []
+    interpreter = FakeMemoryIntentInterpreter(DeleteMemoryIntent("Flutter"))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+    message = "Remova a memória sobre Flutter."
+
+    run_conversation_loop(
+        FakeProvider(),
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: excluir memória" in output
+    assert store.list() == [original]
+    assert interpreter.inputs == [message]
+
+
+def test_memory_delete_confirmation_executes_only_once(tmp_path: Path) -> None:
+    output: list[str] = []
+    provider = FakeProvider()
+    store = create_temp_memory_service(tmp_path)
+    store.add("Eu trabalho com Flutter.")
+    remaining = store.add("Eu trabalho com Dart.").memory
+
+    run_conversation_loop(
+        provider,
+        input_reader=create_input_reader(
+            ["Remova a memória: Eu trabalho com Flutter.", "sim", "confirmar", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert store.list() == [remaining]
+    assert output.count("Memória removida localmente.") == 1
+    assert provider.messages[0][-1].content == "confirmar"
+
+
+def test_memory_delete_cancellation_preserves_memory(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Prefiro respostas diretas.").memory
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(
+            ["Apague a memória: Prefiro respostas diretas.", "cancelar", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Exclusão de memória cancelada." in output
+    assert store.list() == [original]
+
+
+@pytest.mark.parametrize("candidate_count", [0, 2])
+def test_memory_delete_requires_exactly_one_candidate(
+    candidate_count: int,
+    tmp_path: Path,
+) -> None:
+    output: list[str] = []
+    store = create_temp_memory_service(tmp_path)
+    if candidate_count == 2:
+        store.add("Eu trabalho com Flutter.")
+        store.add("Eu estudo Flutter.")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["Remova a memória: Flutter", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Ação proposta: excluir memória" not in output
+    assert len(store.list()) == candidate_count
+    if candidate_count == 0:
+        assert "Nenhuma memória correspondente foi encontrada." in output
+    else:
+        assert any("mais de uma memória correspondente" in message for message in output)
+
+
+def test_memory_delete_exact_match_takes_precedence_over_partial_matches(
+    tmp_path: Path,
+) -> None:
+    output: list[str] = []
+    store = create_temp_memory_service(tmp_path)
+    exact = store.add("Flutter").memory
+    partial = store.add("Eu trabalho com Flutter.").memory
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["Remova a memória: flutter", "sim", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Conteúdo: Flutter" in output
+    assert store.list() == [partial]
+    assert exact is not None
+
+
+def test_memory_delete_uses_partial_search_for_single_candidate(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["Apague a memória: Flutter", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Conteúdo: Eu trabalho com Flutter." in output
+    assert store.list() == [original]
+
+
+def test_delete_gate_rejects_incompatible_intent_and_falls_back_to_conversation(
+    tmp_path: Path,
+) -> None:
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Informação inventada."))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+    message = "Remova a memória sobre Flutter."
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=lambda output: None,
+        memory_service=store,
+    )
+
+    assert store.list() == [original]
+    assert len(provider.messages) == 1
+    assert provider.messages[0][-1].content == message
+    assert interpreter.inputs == [message]
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "not-json",
+        '{"action":"delete_memory","query":"Flutter","extra":true}',
+        '{"action":"delete_memory","query":""}',
+    ],
+)
+def test_invalid_memory_delete_interpretation_falls_back_to_conversation(
+    response: str,
+    tmp_path: Path,
+) -> None:
+    provider = FakeProvider()
+    interpreter = ModelMemoryIntentInterpreter(FakeProvider(response))
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+    message = "Remova a memória sobre Flutter."
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=lambda output: None,
+        memory_service=store,
+    )
+
+    assert store.list() == [original]
+    assert len(provider.messages) == 1
+    assert provider.messages[0][-1].content == message
+
+
+def test_memory_delete_snapshot_conflict_prevents_removal(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+    assert original is not None
+    messages = iter(["Remova a memória: Flutter", "sim", "sair"])
+
+    def input_reader(_: str) -> str:
+        message = next(messages)
+        if message == "sim":
+            store.edit(original.content, "Eu trabalho com Dart.")
+        return message
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=input_reader,
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert any("mudou desde a proposta" in message for message in output)
+    assert store.list()[0].content == "Eu trabalho com Dart."
+
+
+def test_memory_delete_persistence_failure_does_not_report_success(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output: list[str] = []
+    store = create_temp_memory_service(tmp_path)
+    original = store.add("Eu trabalho com Flutter.").memory
+
+    def fail_replace(source: object, destination: object) -> None:
+        del source, destination
+        raise OSError("falha simulada")
+
+    monkeypatch.setattr("packages.memory.data.json_data_source.os.replace", fail_replace)
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["Remova a memória: Flutter", "sim", "sair"]),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Memória removida localmente." not in output
+    assert any("Não foi possível acessar as memórias:" in message for message in output)
+    assert store.list() == [original]
+
+
+def test_literal_command_cancels_pending_memory_delete(tmp_path: Path) -> None:
+    output: list[str] = []
+    store = create_temp_memory_service(tmp_path)
+    store.add("Eu trabalho com Flutter.")
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(
+            ["Remova a memória: Flutter", "lembrar: Uso Dart.", "sim", "sair"]
+        ),
+        output_writer=output.append,
+        memory_service=store,
+    )
+
+    assert "Proposta de exclusão anterior cancelada." in output
+    assert [memory.content for memory in store.list()] == [
+        "Eu trabalho com Flutter.",
+        "Uso Dart.",
+    ]
+
+
+def test_memory_delete_interpretation_does_not_enter_history(tmp_path: Path) -> None:
+    provider = FakeProvider()
+    interpreter = FakeMemoryIntentInterpreter(DeleteMemoryIntent("Flutter"))
+    store = create_temp_memory_service(tmp_path)
+    store.add("Eu trabalho com Flutter.")
+
+    run_conversation_loop(
+        provider,
+        memory_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Remova a memória sobre Flutter.", "não", "Olá", "sair"]),
+        output_writer=lambda output: None,
+        memory_service=store,
+    )
+
+    assert len(provider.messages) == 1
+    assert [message.content for message in provider.messages[0][1:]] == ["Olá"]

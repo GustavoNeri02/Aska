@@ -1,7 +1,12 @@
 from collections.abc import Callable
 
-from packages.conversation import PendingMemoryAdd, PendingMemoryEdit
-from packages.memory import AddMemoryResult, AddMemoryStatus, EditMemoryStatus
+from packages.conversation import PendingMemoryAdd, PendingMemoryDelete, PendingMemoryEdit
+from packages.memory import (
+    AddMemoryResult,
+    AddMemoryStatus,
+    DeleteMemoryStatus,
+    EditMemoryStatus,
+)
 
 
 def present_memory_add_proposal(
@@ -23,6 +28,30 @@ def present_memory_add_result(
         AddMemoryStatus.INVALID: "O conteúdo proposto não é válido.",
     }
     output_writer(messages[result.status])
+
+
+def present_memory_delete_proposal(
+    pending_delete: PendingMemoryDelete,
+    output_writer: Callable[[str], None],
+) -> None:
+    output_writer("Ação proposta: excluir memória")
+    output_writer(f"Conteúdo: {pending_delete.expected_content}")
+    output_writer("Confirmar exclusão? Digite 'sim' para confirmar ou 'não' para cancelar.")
+
+
+def present_memory_delete_result(
+    status: DeleteMemoryStatus,
+    output_writer: Callable[[str], None],
+) -> None:
+    messages = {
+        DeleteMemoryStatus.DELETED: "Memória removida localmente.",
+        DeleteMemoryStatus.NOT_FOUND: "A memória proposta não foi encontrada.",
+        DeleteMemoryStatus.INVALID: "A proposta de exclusão não é mais válida.",
+        DeleteMemoryStatus.CONFLICT: (
+            "A memória mudou desde a proposta. Nenhuma exclusão foi feita."
+        ),
+    }
+    output_writer(messages[status])
 
 
 def present_memory_edit_proposal(

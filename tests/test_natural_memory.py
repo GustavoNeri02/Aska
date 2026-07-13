@@ -5,13 +5,16 @@ import pytest
 
 from packages.conversation import (
     AddMemoryIntent,
+    DeleteMemoryIntent,
     ModelMemoryIntentInterpreter,
     ModelMessage,
     NameUpdateIntent,
     detect_memory_add,
+    detect_memory_delete,
     detect_name_change,
     find_name_memory_candidates,
     should_interpret_memory_add,
+    should_interpret_memory_delete,
     should_interpret_memory_intent,
     should_interpret_name_change,
 )
@@ -97,6 +100,70 @@ def test_detect_memory_add_leaves_non_exact_paraphrase_for_interpreter() -> None
 
     assert detect_memory_add(message) is None
     assert should_interpret_memory_add(message) is True
+
+
+@pytest.mark.parametrize(
+    ("message", "query"),
+    [
+        ("Esqueça que eu trabalho com Flutter.", "eu trabalho com Flutter."),
+        ("Remova a memória: prefiro respostas diretas.", "prefiro respostas diretas."),
+        ("Apague a memória: meu projeto antigo.", "meu projeto antigo."),
+        ("eSqUeÇa QuE   Uso Python.   ", "Uso Python."),
+    ],
+)
+def test_detect_memory_delete_accepts_exact_patterns(
+    message: str,
+    query: str,
+) -> None:
+    assert detect_memory_delete(message) == DeleteMemoryIntent(query)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Esqueça que",
+        "Remova a memória:   ",
+        "Apague a memória:\nProjeto antigo.",
+        "Esqueça que uma coisa.\nOutra coisa.",
+    ],
+)
+def test_memory_delete_rejects_empty_or_multiline_before_interpretation(
+    message: str,
+) -> None:
+    assert detect_memory_delete(message) is None
+    assert should_interpret_memory_delete(message) is False
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Remova a memória sobre Flutter.",
+        "Não precisa mais lembrar que prefiro respostas diretas.",
+        "Apague o que você guardou sobre meu projeto antigo.",
+    ],
+)
+def test_memory_delete_gate_accepts_explicit_paraphrases(message: str) -> None:
+    assert should_interpret_memory_delete(message) is True
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "O que você esqueceu?",
+        "Você lembra de Flutter?",
+        "Quais memórias podem ser removidas?",
+        "Conte o que sabe sobre mim.",
+    ],
+)
+def test_memory_delete_gate_rejects_questions(message: str) -> None:
+    assert should_interpret_memory_delete(message) is False
+
+
+def test_memory_delete_gate_does_not_capture_explicit_memory_add() -> None:
+    message = "Não esqueça que prefiro respostas diretas."
+
+    assert should_interpret_memory_add(message) is True
+    assert should_interpret_memory_delete(message) is False
 
 
 def test_find_name_memory_candidates_uses_restricted_text_patterns() -> None:
@@ -198,6 +265,15 @@ def test_model_interpreter_returns_typed_memory_add() -> None:
     assert result == AddMemoryIntent("Eu trabalho com Flutter.")
 
 
+def test_model_interpreter_returns_typed_memory_delete() -> None:
+    provider = StaticProvider('{"action":"delete_memory","query":"trabalho com Flutter"}')
+    interpreter = ModelMemoryIntentInterpreter(provider)
+
+    result = interpreter.interpret("Remova a memória sobre Flutter.")
+
+    assert result == DeleteMemoryIntent("trabalho com Flutter")
+
+
 @pytest.mark.parametrize(
     "response",
     [
@@ -213,6 +289,23 @@ def test_model_interpreter_rejects_invalid_memory_add(response: str) -> None:
     interpreter = ModelMemoryIntentInterpreter(StaticProvider(response))
 
     assert interpreter.interpret("Lembre que gosto de Flutter.") is None
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        '```json\n{"action":"delete_memory","query":"Flutter"}\n```',
+        '{"action":"delete_memory","query":"Flutter","extra":true}',
+        '{"action":"delete_memory","query":""}',
+        '{"action":"delete_memory","query":42}',
+        '{"action":"delete_memory","query":"Flutter\nPython"}',
+        '{"action":"remove_memory","query":"Flutter"}',
+    ],
+)
+def test_model_interpreter_rejects_invalid_memory_delete(response: str) -> None:
+    interpreter = ModelMemoryIntentInterpreter(StaticProvider(response))
+
+    assert interpreter.interpret("Remova a memória sobre Flutter.") is None
 
 
 @pytest.mark.parametrize(

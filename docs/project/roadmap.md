@@ -30,13 +30,14 @@
 - O núcleo conversacional envia identidade, histórico e mensagem atual com papéis estruturados e independentes do modelo.
 - Mudanças naturais do nome de Gustavo usam padrões determinísticos ou interpretação limitada por modelo para gerar uma proposta; confirmação e edição por ID e snapshot permanecem locais.
 - Pedidos naturais explícitos de memorização usam padrões determinísticos ou interpretação limitada por modelo para gerar uma proposta; somente a confirmação local aciona `MemoryService.add()`.
+- Pedidos naturais explícitos de exclusão selecionam candidatas localmente e somente a confirmação aciona exclusão por ID e snapshot.
 
 ### Comportamento atual
 
 - Session Context está implementado e usa histórico em memória com papéis `user` e `assistant` durante a conversa atual; a identidade mínima do Aska é enviada como mensagem `system`.
 - A orquestração de conversa e a construção de contexto estão separadas do CLI; entradas do terminal são convertidas em comandos tipados antes da execução.
 - Persistent Memory está `in_progress` e já suporta persistência JSON estruturada com identidade e metadados mínimos, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
-- O fluxo natural está implementado somente para edição do nome e criação explícita de uma memória. Padrões exatos evitam chamadas ao modelo e gates locais limitam a interpretação de paráfrases; o modelo apenas propõe, enquanto confirmação e persistência permanecem locais. Captura automática, exclusão natural, edição genérica e pedidos mais amplos continuam `planned`.
+- O fluxo natural está implementado somente para edição do nome e criação ou exclusão explícita de uma memória. Padrões exatos evitam chamadas ao modelo e gates locais limitam a interpretação de paráfrases; o modelo apenas propõe, enquanto seleção, confirmação e persistência permanecem locais. Captura automática, edição genérica e pedidos mais amplos continuam `planned`.
 - O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.
 
 ### Incremento atual de memória explícita

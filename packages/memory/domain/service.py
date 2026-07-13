@@ -29,6 +29,13 @@ class EditMemoryStatus(StrEnum):
     CONFLICT = "conflict"
 
 
+class DeleteMemoryStatus(StrEnum):
+    DELETED = "deleted"
+    NOT_FOUND = "not_found"
+    INVALID = "invalid"
+    CONFLICT = "conflict"
+
+
 class MemoryService:
     def __init__(
         self,
@@ -79,6 +86,33 @@ class MemoryService:
 
         self._repository.save_all([*memories[:index], *memories[index + 1 :]])
         return True
+
+    def delete_by_id(
+        self,
+        memory_id: str,
+        expected_content: str,
+    ) -> DeleteMemoryStatus:
+        try:
+            UUID(memory_id)
+        except (ValueError, AttributeError, TypeError):
+            return DeleteMemoryStatus.INVALID
+
+        expected_value = expected_content.strip()
+        if not expected_value:
+            return DeleteMemoryStatus.INVALID
+
+        memories = self._repository.list()
+        index = next(
+            (index for index, memory in enumerate(memories) if memory.id == memory_id),
+            None,
+        )
+        if index is None:
+            return DeleteMemoryStatus.NOT_FOUND
+        if memories[index].content != expected_value:
+            return DeleteMemoryStatus.CONFLICT
+
+        self._repository.save_all([*memories[:index], *memories[index + 1 :]])
+        return DeleteMemoryStatus.DELETED
 
     def edit(self, current_content: str, new_content: str) -> EditMemoryStatus:
         current_value = current_content.strip()

@@ -54,7 +54,11 @@ O primeiro pedido natural de gerenciamento de memória reconhece somente mudanç
 
 ### Criação natural explícita de memória — `implemented`
 
-Pedidos explícitos nos padrões completos `lembre que`, `memorize que`, `guarde que` ou `não esqueça que` produzem `AddMemoryIntent` deterministicamente, preservando o conteúdo informado e sem chamar o modelo. Paráfrases passam por um gate local e podem produzir a mesma intenção por JSON estrito. O modelo apenas interpreta e propõe uma única memória: não recebe serviços ou IDs, não persiste e não informa sucesso. A proposta imutável exige confirmação local e somente então o CLI chama `MemoryService.add()`, apresentando seu resultado real. Captura automática, exclusão natural, edição genérica e frameworks de ações continuam `planned`.
+Pedidos explícitos nos padrões completos `lembre que`, `memorize que`, `guarde que` ou `não esqueça que` produzem `AddMemoryIntent` deterministicamente, preservando o conteúdo informado e sem chamar o modelo. Paráfrases passam por um gate local e podem produzir a mesma intenção por JSON estrito. O modelo apenas interpreta e propõe uma única memória: não recebe serviços ou IDs, não persiste e não informa sucesso. A proposta imutável exige confirmação local e somente então o CLI chama `MemoryService.add()`, apresentando seu resultado real. Captura automática, edição genérica e frameworks de ações continuam `planned`.
+
+### Exclusão natural confirmada de memória — `implemented`
+
+Pedidos explícitos de exclusão usam padrões determinísticos ou um gate local específico seguido de `DeleteMemoryIntent` por JSON estrito. O modelo fornece somente a query e nunca recebe IDs, serviços ou a lista de memórias. O CLI seleciona candidatas localmente, priorizando igualdade sem distinção de caixa e usando pesquisa textual apenas quando não há igualdade; zero ou múltiplas candidatas não são escolhidas. A proposta guarda ID e snapshot, exige confirmação e é executada por `MemoryService.delete_by_id()`, que impede exclusão após conflito. Edição natural genérica, captura automática e frameworks de ações continuam `planned`.
 
 ## Decisões substituídas, rejeitadas ou adiadas
 

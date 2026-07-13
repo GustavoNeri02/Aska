@@ -2,7 +2,13 @@ from datetime import UTC, datetime
 
 import pytest
 
-from packages.memory import AddMemoryStatus, EditMemoryStatus, Memory, MemoryService
+from packages.memory import (
+    AddMemoryStatus,
+    DeleteMemoryStatus,
+    EditMemoryStatus,
+    Memory,
+    MemoryService,
+)
 
 
 class InMemoryRepository:
@@ -219,3 +225,68 @@ def test_edit_by_id_rejects_duplicate_content_without_persisting() -> None:
 
     assert status is EditMemoryStatus.DUPLICATE
     assert repository.memories == [original, duplicate]
+
+
+def test_delete_by_id_removes_only_matching_memory() -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+    target = service.add("Eu trabalho com Flutter.").memory
+    assert target is not None
+    service = MemoryService(
+        repository,
+        id_factory=lambda: "87654321-4321-8765-4321-876543218765",
+    )
+    remaining = service.add("Prefiro respostas diretas.").memory
+    assert remaining is not None
+
+    status = service.delete_by_id(target.id, target.content)
+
+    assert status is DeleteMemoryStatus.DELETED
+    assert repository.memories == [remaining]
+
+
+@pytest.mark.parametrize(
+    ("memory_id", "expected_status"),
+    [
+        ("not-a-uuid", DeleteMemoryStatus.INVALID),
+        ("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", DeleteMemoryStatus.NOT_FOUND),
+    ],
+)
+def test_delete_by_id_rejects_invalid_or_missing_id(
+    memory_id: str,
+    expected_status: DeleteMemoryStatus,
+) -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+    original = service.add("Eu trabalho com Flutter.").memory
+    assert original is not None
+
+    status = service.delete_by_id(memory_id, original.content)
+
+    assert status is expected_status
+    assert repository.memories == [original]
+
+
+def test_delete_by_id_rejects_empty_snapshot() -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+    original = service.add("Eu trabalho com Flutter.").memory
+    assert original is not None
+
+    status = service.delete_by_id(original.id, "   ")
+
+    assert status is DeleteMemoryStatus.INVALID
+    assert repository.memories == [original]
+
+
+def test_delete_by_id_rejects_divergent_snapshot() -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+    original = service.add("Eu trabalho com Flutter.").memory
+    assert original is not None
+    service.edit(original.content, "Eu trabalho com Dart.")
+
+    status = service.delete_by_id(original.id, original.content)
+
+    assert status is DeleteMemoryStatus.CONFLICT
+    assert repository.memories[0].content == "Eu trabalho com Dart."
