@@ -6,7 +6,7 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 
-from packages.conversation import ModelProviderError
+from packages.conversation import ASKA_IDENTITY, ModelMessage, ModelProviderError, ModelRole
 from packages.inference import OllamaProvider
 
 
@@ -24,7 +24,14 @@ def test_ollama_provider_generates_chat_response() -> None:
     with patch("packages.inference.ollama.urlopen", return_value=response) as urlopen_mock:
         provider = OllamaProvider(model="test-model")
 
-        result = provider.generate("Olá")
+        result = provider.generate(
+            [
+                ModelMessage(ModelRole.SYSTEM, ASKA_IDENTITY),
+                ModelMessage(ModelRole.USER, "Olá"),
+                ModelMessage(ModelRole.ASSISTANT, "Olá, Gustavo"),
+                ModelMessage(ModelRole.USER, "Como vai?"),
+            ]
+        )
 
     request = urlopen_mock.call_args.args[0]
     payload = json.loads(request.data)
@@ -32,7 +39,12 @@ def test_ollama_provider_generates_chat_response() -> None:
     assert result == "Ola!"
     assert payload == {
         "model": "test-model",
-        "messages": [{"role": "user", "content": "Olá"}],
+        "messages": [
+            {"role": "system", "content": ASKA_IDENTITY},
+            {"role": "user", "content": "Olá"},
+            {"role": "assistant", "content": "Olá, Gustavo"},
+            {"role": "user", "content": "Como vai?"},
+        ],
         "stream": False,
     }
 
@@ -42,7 +54,7 @@ def test_ollama_provider_reports_connection_error() -> None:
         provider = OllamaProvider(model="test-model")
 
         with pytest.raises(ModelProviderError, match="conectar ao Ollama"):
-            provider.generate("Olá")
+            provider.generate([ModelMessage(ModelRole.USER, "Olá")])
 
 
 def test_ollama_provider_reports_api_error() -> None:
@@ -58,7 +70,7 @@ def test_ollama_provider_reports_api_error() -> None:
         provider = OllamaProvider(model="missing-model")
 
         with pytest.raises(ModelProviderError, match="erro 404: model not found"):
-            provider.generate("Olá")
+            provider.generate([ModelMessage(ModelRole.USER, "Olá")])
 
 
 def test_ollama_provider_rejects_invalid_response() -> None:
@@ -68,7 +80,7 @@ def test_ollama_provider_rejects_invalid_response() -> None:
         provider = OllamaProvider(model="test-model")
 
         with pytest.raises(ModelProviderError, match="resposta inválida"):
-            provider.generate("Olá")
+            provider.generate([ModelMessage(ModelRole.USER, "Olá")])
 
 
 def test_ollama_provider_warms_up_configured_model() -> None:

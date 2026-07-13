@@ -1,8 +1,9 @@
 import json
+from collections.abc import Sequence
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from packages.conversation import ModelProviderError
+from packages.conversation import ModelMessage, ModelProviderError
 
 
 class OllamaProvider:
@@ -63,11 +64,13 @@ class OllamaProvider:
                 "O Ollama demorou demais para descarregar o modelo."
             ) from error
 
-    def generate(self, prompt: str) -> str:
+    def generate(self, messages: Sequence[ModelMessage]) -> str:
         payload = json.dumps(
             {
                 "model": self._model,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": [
+                    {"role": message.role.value, "content": message.content} for message in messages
+                ],
                 "stream": False,
             }
         ).encode("utf-8")

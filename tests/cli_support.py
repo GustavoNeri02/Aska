@@ -1,7 +1,7 @@
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 
-from packages.conversation import ModelProviderError
+from packages.conversation import ModelMessage, ModelProviderError
 from packages.memory import JsonMemoryDataSource, LocalMemoryRepository, MemoryService
 
 
@@ -16,27 +16,27 @@ def create_temp_memory_service(tmp_path: Path) -> MemoryService:
 class FakeProvider:
     def __init__(self, response: str = "Resposta local") -> None:
         self.response = response
-        self.messages: list[str] = []
+        self.messages: list[list[ModelMessage]] = []
 
-    def generate(self, prompt: str) -> str:
-        self.messages.append(prompt)
+    def generate(self, messages: Sequence[ModelMessage]) -> str:
+        self.messages.append(list(messages))
         return self.response
 
 
 class FailingProvider:
-    def generate(self, prompt: str) -> str:
-        del prompt
+    def generate(self, messages: Sequence[ModelMessage]) -> str:
+        del messages
         raise ModelProviderError("Modelo indisponível")
 
 
 class FailingThenWorkingProvider:
     def __init__(self, response: str = "Resposta local") -> None:
         self.response = response
-        self.messages: list[str] = []
+        self.messages: list[list[ModelMessage]] = []
         self._should_fail = True
 
-    def generate(self, prompt: str) -> str:
-        self.messages.append(prompt)
+    def generate(self, messages: Sequence[ModelMessage]) -> str:
+        self.messages.append(list(messages))
         if self._should_fail:
             self._should_fail = False
             raise ModelProviderError("Modelo indisponível")

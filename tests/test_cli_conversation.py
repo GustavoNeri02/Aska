@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from apps.cli.app import run_conversation_loop
+from packages.conversation import ModelRole
 from tests.cli_support import (
     FailingProvider,
     FailingThenWorkingProvider,
@@ -24,7 +25,11 @@ def test_conversation_sends_message_to_provider(tmp_path: Path) -> None:
         memory_service=create_temp_memory_service(tmp_path),
     )
 
-    assert provider.messages == ["Olá"]
+    assert [message.role for message in provider.messages[0]] == [
+        ModelRole.SYSTEM,
+        ModelRole.USER,
+    ]
+    assert provider.messages[0][-1].content == "Olá"
     assert "Aska > Resposta local" in output
 
 
@@ -39,11 +44,17 @@ def test_conversation_sends_recent_history_as_context(tmp_path: Path) -> None:
         memory_service=create_temp_memory_service(tmp_path),
     )
 
-    assert provider.messages[0] == "Olá"
-    assert "Histórico da sessão" in provider.messages[1]
-    assert "Você: Olá" in provider.messages[1]
-    assert "Aska: Resposta local" in provider.messages[1]
-    assert "Você: Me conte mais" in provider.messages[1]
+    assert [message.role for message in provider.messages[1]] == [
+        ModelRole.SYSTEM,
+        ModelRole.USER,
+        ModelRole.ASSISTANT,
+        ModelRole.USER,
+    ]
+    assert [message.content for message in provider.messages[1][1:]] == [
+        "Olá",
+        "Resposta local",
+        "Me conte mais",
+    ]
     assert "Aska > Resposta local" in output
 
 
@@ -115,6 +126,10 @@ def test_conversation_does_not_include_provider_error_in_next_context(tmp_path: 
         memory_service=create_temp_memory_service(tmp_path),
     )
 
-    assert provider.messages == ["Olá", "Como vai"]
+    assert [request[-1].content for request in provider.messages] == ["Olá", "Como vai"]
+    assert [message.role for message in provider.messages[1]] == [
+        ModelRole.SYSTEM,
+        ModelRole.USER,
+    ]
     assert "Aska > Modelo indisponível" in output
     assert "Aska > Resposta local" in output

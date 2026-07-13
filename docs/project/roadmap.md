@@ -27,10 +27,11 @@
 - Ollama e Gemma 3 12B validados com uma resposta local ponta a ponta.
 - O modelo carregado pelo Ollama é descarregado via API ao encerrar o CLI, respeitando o servidor configurado por `ASKA_OLLAMA_URL`.
 - O CLI exibe um loading enquanto conecta ao Ollama e carrega o modelo no início.
+- O núcleo conversacional envia identidade, histórico e mensagem atual com papéis estruturados e independentes do modelo.
 
 ### Comportamento atual
 
-- Session Context está implementado e usa histórico em memória durante a conversa atual.
+- Session Context está implementado e usa histórico em memória com papéis `user` e `assistant` durante a conversa atual; a identidade mínima do Aska é enviada como mensagem `system`.
 - A orquestração de conversa e a construção de contexto estão separadas do CLI; entradas do terminal são convertidas em comandos tipados antes da execução.
 - Persistent Memory está `in_progress` e já suporta persistência JSON estruturada com identidade e metadados mínimos, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
 - O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.

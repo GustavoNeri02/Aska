@@ -27,11 +27,11 @@ class ConversationService:
         return list(self._history)
 
     def send(self, user_message: str) -> str:
-        prompt = self._context_builder.build(
+        messages = self._context_builder.build(
             history=self._history,
             user_message=user_message,
             memories=self._memory_reader.list(),
         )
-        response = self._model_provider.generate(prompt)
+        response = self._model_provider.generate(messages)
         self._history.append(ConversationTurn(user_message, response))
         return response

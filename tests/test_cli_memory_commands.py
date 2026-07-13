@@ -270,9 +270,10 @@ def test_conversation_updates_provider_context_after_edit(tmp_path: Path) -> Non
     )
 
     assert len(provider.messages) == 1
-    assert "Memórias salvas:" in provider.messages[0]
-    assert "- gosto de dart" in provider.messages[0]
-    assert "gosto de python" not in provider.messages[0]
+    system_content = provider.messages[0][0].content
+    assert "Memórias sobre Gustavo:" in system_content
+    assert "- gosto de dart" in system_content
+    assert "gosto de python" not in system_content
 
 
 def test_run_conversation_loop_edit_uses_injected_store_without_touching_real_file(
@@ -322,9 +323,9 @@ def test_conversation_does_not_include_removed_memory_in_model_context(tmp_path:
     )
 
     assert len(provider.messages) == 1
-    assert "Memórias salvas:" not in provider.messages[0]
-    assert "gosto de python" not in provider.messages[0]
-    assert provider.messages[0] == "Olá"
+    assert "Memórias sobre Gustavo:" not in provider.messages[0][0].content
+    assert not any("gosto de python" in message.content for message in provider.messages[0])
+    assert provider.messages[0][-1].content == "Olá"
 
 
 def test_conversation_includes_saved_memories_in_model_context(tmp_path: Path) -> None:
@@ -341,9 +342,10 @@ def test_conversation_includes_saved_memories_in_model_context(tmp_path: Path) -
     )
 
     assert len(provider.messages) == 1
-    assert "Memórias salvas:" in provider.messages[0]
-    assert "- gosto de python" in provider.messages[0]
-    assert "Você: Olá" in provider.messages[0]
-    assert memory.id not in provider.messages[0]
-    assert memory.source not in provider.messages[0]
-    assert memory.created_at.isoformat() not in provider.messages[0]
+    system_content = provider.messages[0][0].content
+    assert "Memórias sobre Gustavo:" in system_content
+    assert "- gosto de python" in system_content
+    assert provider.messages[0][-1].content == "Olá"
+    assert memory.id not in system_content
+    assert memory.source.value not in system_content
+    assert memory.created_at.isoformat() not in system_content

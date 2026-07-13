@@ -40,8 +40,8 @@ Esses tipos descrevem a direção arquitetural, não componentes já implementad
 - A remoção explícita de uma memória salva está disponível por meio do comando `esquecer:` com correspondência exata.
 - A edição explícita de uma memória salva está disponível por meio do comando `editar memória: <texto atual> -> <novo texto>` com correspondência exata e sem duplicação.
 - A pesquisa textual explícita de memórias salvas está disponível por meio do comando `buscar memória: <termo>` com correspondência parcial e sem distinção de maiúsculas/minúsculas.
-- Em cada interação conversacional, `ConversationService` consulta as memórias persistidas pelo contrato `MemoryReader` e delega ao `ContextBuilder` a inclusão do conteúdo no prompt, junto com o histórico da sessão, inclusive em novas execuções. O CLI apenas compõe e injeta o `MemoryService` e despacha os comandos de entrada.
-- O contexto enviado ao modelo contém somente `content`; identidade e metadados permanecem locais por padrão.
+- Em cada interação conversacional, `ConversationService` consulta as memórias persistidas pelo contrato `MemoryReader` e delega ao `ContextBuilder` a inclusão do conteúdo na mensagem `system`, junto da identidade estável do Aska. O histórico da sessão segue em mensagens separadas com papéis `user` e `assistant`, inclusive quando as memórias vêm de execuções anteriores. O CLI apenas compõe e injeta o `MemoryService` e despacha os comandos de entrada.
+- Das memórias, somente `content` é enviado ao modelo; IDs e metadados permanecem locais por padrão.
 
 ## Transparência e controle
 
@@ -50,7 +50,7 @@ O usuário deve poder listar, pesquisar, editar e excluir memórias, marcá-las 
 ## Limitações atuais
 
 - Todas as memórias salvas são enviadas em todas as requisições ao modelo; não há seleção por relevância.
-- O contexto é serializado como texto livre por `ContextBuilder`; a estrutura e os metadados persistidos não são expostos ao modelo.
+- O conteúdo das memórias ainda é serializado como uma lista textual dentro da mensagem `system`; a estrutura e os metadados persistidos não são expostos ao modelo.
 - Não há compactação, orçamento de tokens, tipos avançados ou explicabilidade além da origem e das datas mínimas.
 - O histórico da sessão continua separado e apenas em memória durante a execução atual.
 - JSON continua sendo o armazenamento atual. SQLite é uma evolução provável quando consultas, volume ou atomicidade justificarem a mudança, mas ainda não foi adotado.

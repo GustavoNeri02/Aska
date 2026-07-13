@@ -42,7 +42,11 @@ Histórico da sessão, composição de contexto e chamada ao modelo pertencem a 
 
 ### Provider como port da conversa — `implemented`
 
-O contrato `ModelProvider` pertence a `packages/conversation`, camada que o consome, e permanece restrito a `generate()`. O adaptador Ollama fica em `packages/inference`; seu `warm_up()` e `unload()` são coordenados concretamente pelo composition root do CLI e não constituem um lifecycle abstrato de providers. Esse contrato só será ampliado quando existir necessidade comum entre providers. O nome anterior `packages/models` foi substituído por ser ambíguo com modelos de domínio.
+O contrato `ModelProvider` pertence a `packages/conversation`, camada que o consome, e permanece restrito a `generate()`, agora recebendo uma sequência de mensagens estruturadas provider-agnostic. O adaptador Ollama fica em `packages/inference` e apenas converte papéis e conteúdos para seu payload; seu `warm_up()` e `unload()` são coordenados concretamente pelo composition root do CLI e não constituem um lifecycle abstrato de providers. Esse contrato só será ampliado quando existir necessidade comum entre providers. O nome anterior `packages/models` foi substituído por ser ambíguo com modelos de domínio.
+
+### Identidade mínima e mensagens estruturadas — `implemented`
+
+A identidade estável do Aska pertence a `packages/conversation` e é enviada como mensagem `system`, independentemente do modelo configurado. Mensagens de Gustavo e respostas da Aska preservam respectivamente os papéis `user` e `assistant`; memórias fornecem apenas contexto textual na mensagem de sistema, sem expor identidade ou metadados persistidos. Neste incremento não existe sistema genérico de personas, prompts ou templates.
 
 ## Decisões substituídas, rejeitadas ou adiadas
 

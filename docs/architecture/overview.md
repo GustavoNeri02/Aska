@@ -42,11 +42,11 @@ O modelo é um componente usado pela conversa e pelo raciocínio, não o sistema
 - Interfaces de usuário não contêm lógica de IA, memória ou ferramentas.
 - Ações do sistema passam por política de segurança antes da execução.
 
-O pacote `packages/conversation` concentra a orquestração da conversa, o histórico da sessão e a construção de contexto, sem depender do CLI. O CLI permanece como adaptador de entrada e saída e converte texto em comandos tipados.
+O pacote `packages/conversation` concentra a orquestração da conversa, o histórico da sessão, a identidade mínima do Aska e a construção de mensagens estruturadas com papéis `system`, `user` e `assistant`, sem depender do CLI. O CLI permanece como adaptador de entrada e saída e converte texto em comandos tipados.
 
 No CLI, `commands.py` define as intenções tipadas, `command_parser.py` converte texto nesses comandos e `handlers/memory.py` traduz comandos de memória em chamadas ao `MemoryService` e mensagens de saída. `app.py` mantém somente o loop, o despacho de alto nível e o composition root.
 
-O contrato `ModelProvider` pertence a `packages/conversation`, que é seu consumidor, e expõe somente `generate()`, a operação necessária para a conversa. O pacote `packages/inference` contém o primeiro adaptador, que usa a API HTTP local do Ollama. `warm_up()` e `unload()` são comportamentos específicos de `OllamaProvider` e são coordenados pelo composition root do CLI; não fazem parte de um lifecycle abstrato de providers. Um contrato de lifecycle só deve ser introduzido quando mais providers apresentarem uma necessidade comum concreta. llama.cpp, LM Studio e vLLM continuam alternativas futuras. Gemini, ChatGPT e outras IAs externas podem ajudar no desenvolvimento, mas não são dependências de runtime.
+O contrato `ModelProvider` pertence a `packages/conversation`, que é seu consumidor, e expõe somente `generate()` sobre uma sequência provider-agnostic de `ModelMessage`. A identidade do Aska compõe a primeira mensagem `system`; entradas e respostas preservam os papéis `user` e `assistant`. O pacote `packages/inference` contém o primeiro adaptador, que converte essas mensagens para a API HTTP do Ollama sem definir identidade ou contexto. `warm_up()` e `unload()` são comportamentos específicos de `OllamaProvider` e são coordenados pelo composition root do CLI; não fazem parte de um lifecycle abstrato de providers. Um contrato de lifecycle só deve ser introduzido quando mais providers apresentarem uma necessidade comum concreta. llama.cpp, LM Studio e vLLM continuam alternativas futuras. Gemini, ChatGPT e outras IAs externas podem ajudar no desenvolvimento, mas não são dependências de runtime.
 
 ## Monorepo
 

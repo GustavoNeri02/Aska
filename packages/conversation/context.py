@@ -1,30 +1,29 @@
-from packages.conversation.model import ConversationTurn
+from collections.abc import Sequence
+
+from packages.conversation.identity import ASKA_IDENTITY
+from packages.conversation.model import ConversationTurn, ModelMessage, ModelRole
 from packages.memory import Memory
 
 
 class ContextBuilder:
     def build(
         self,
-        history: list[ConversationTurn],
+        history: Sequence[ConversationTurn],
         user_message: str,
-        memories: list[Memory],
-    ) -> str:
-        lines: list[str] = []
+        memories: Sequence[Memory],
+    ) -> list[ModelMessage]:
+        system_content = ASKA_IDENTITY
 
         if memories:
-            lines.append("Memórias salvas:")
-            lines.extend(f"- {memory.content}" for memory in memories)
-            lines.append("")
+            memory_context = "\n".join(
+                ["Memórias sobre Gustavo:", *(f"- {memory.content}" for memory in memories)]
+            )
+            system_content = f"{system_content}\n\n{memory_context}"
 
-        if history:
-            lines.append("Histórico da sessão:")
-            for turn in history:
-                lines.append(f"Você: {turn.user_message}")
-                lines.append(f"Aska: {turn.assistant_message}")
-            lines.append("")
+        messages = [ModelMessage(ModelRole.SYSTEM, system_content)]
+        for turn in history:
+            messages.append(ModelMessage(ModelRole.USER, turn.user_message))
+            messages.append(ModelMessage(ModelRole.ASSISTANT, turn.assistant_message))
 
-        if not lines:
-            return user_message
-
-        lines.append(f"Você: {user_message}")
-        return "\n".join(lines)
+        messages.append(ModelMessage(ModelRole.USER, user_message))
+        return messages

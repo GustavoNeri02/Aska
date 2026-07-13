@@ -1,8 +1,11 @@
+from collections.abc import Sequence
 from typing import Protocol
+
+from packages.conversation.model import ModelMessage
 
 
 class ModelProvider(Protocol):
-    def generate(self, prompt: str) -> str: ...
+    def generate(self, messages: Sequence[ModelMessage]) -> str: ...
 
 
 class ModelProviderError(RuntimeError):
