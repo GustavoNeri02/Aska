@@ -30,15 +30,15 @@ O primeiro adaptador usa a API HTTP local do Ollama atrás do contrato `ModelPro
 
 O modelo padrão é `gemma3:12b`, adequado à GPU principal com 16 GB de VRAM. A escolha permanece configurável por `ASKA_MODEL` e não faz parte do contrato interno.
 
-### Memória persistente local explícita — `in_progress`
+### Memória persistente local explícita — `implemented`
 
-A primeira forma de memória persistente continua sendo o armazenamento local em JSON, exclusivamente com objetos contendo identidade estável, conteúdo, origem e datas de criação e alteração em UTC. Listas de strings não são suportadas. A captura ocorre por comando literal ou por proposta natural explícita confirmada; os comandos do CLI permanecem disponíveis para controle, e somente o conteúdo é enviado ao modelo por padrão. SQLite é uma evolução provável quando o armazenamento simples deixar de atender, mas não foi adotado neste incremento.
+A primeira forma de memória persistente é o armazenamento local em JSON, exclusivamente com objetos contendo identidade estável, conteúdo, origem e datas de criação e alteração em UTC. Listas de strings não são suportadas. A captura ocorre por comando literal ou por proposta natural explícita confirmada; os comandos do CLI permanecem disponíveis para controle, e somente o conteúdo é enviado ao modelo por padrão. A prevenção de duplicatas cobre equivalência textual superficial, não equivalência semântica ou contradições. SQLite poderá ser considerado quando o armazenamento simples deixar de atender, mas não foi adotado nesta fase.
 
 O domínio e as regras de memória são separados da persistência por `MemoryService` e `MemoryRepository`. `LocalMemoryRepository` implementa o contrato e depende de `MemoryLocalDataSource`; `JsonMemoryDataSource` é a implementação atual, responsável por JSON, filesystem, cache lazy e escrita atômica. Essa separação foi adotada para permitir um futuro `SqliteMemoryDataSource` sem alterar os casos de aplicação. SQLite permanece `planned` e não foi implementado.
 
 ### Conversa independente da interface — `implemented`
 
-Histórico da sessão, composição de contexto e chamada ao modelo pertencem a `packages/conversation`. O CLI interpreta entradas em comandos tipados e apresenta resultados. A composição de `OllamaProvider`, `JsonMemoryDataSource`, `LocalMemoryRepository` e `MemoryService` continua manual no entry point, sem container de injeção de dependência.
+Histórico da sessão, composição de contexto e chamada ao modelo pertencem a `packages/conversation`. No CLI, `app.py` mantém o loop, o despacho de alto nível e o composition root, enquanto `NaturalMemoryHandler` coordena os fluxos naturais específicos da interface. A composição de `OllamaProvider`, `JsonMemoryDataSource`, `LocalMemoryRepository` e `MemoryService` continua manual no entry point, sem container de injeção de dependência.
 
 ### Provider como port da conversa — `implemented`
 

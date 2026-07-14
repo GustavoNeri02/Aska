@@ -46,22 +46,26 @@ Esses tipos descrevem a direção arquitetural, não componentes já implementad
 - A exclusão natural aceita padrões completos como `esqueça que`, `remova a memória:` e `apague a memória:` ou paráfrases que passem por um gate específico e produzam JSON estrito. O modelo fornece somente uma query e não recebe IDs ou a lista de memórias. A seleção local tenta primeiro igualdade sem distinção de caixa e depois a pesquisa textual existente; exatamente uma candidata gera `PendingMemoryDelete`. Após confirmação, `MemoryService.delete_by_id()` valida ID e snapshot antes de persistir.
 - A edição natural usa ID estável e snapshot do conteúdo esperado. ID inválido, memória ausente, conteúdo divergente ou duplicado não são persistidos. Comandos literais de memória continuam disponíveis e cancelam uma proposta pendente antes de executar.
 - A prevenção de duplicatas compara uma chave privada com `strip`, Unicode NFKC, espaços consecutivos colapsados, `casefold` e remoção de um único ponto terminal. O conteúdo original continua sendo persistido sem essa normalização, e a equivalência não impede editar apenas a capitalização ou formatação da própria memória.
-- Em cada interação conversacional, `ConversationService` consulta as memórias persistidas pelo contrato `MemoryReader` e delega ao `ContextBuilder` a inclusão do conteúdo na mensagem `system`, junto da identidade estável do Aska. O histórico da sessão segue em mensagens separadas com papéis `user` e `assistant`, inclusive quando as memórias vêm de execuções anteriores. O CLI apenas compõe e injeta o `MemoryService` e despacha os comandos de entrada.
+- Em cada interação conversacional, `ConversationService` consulta as memórias persistidas pelo contrato `MemoryReader` e delega ao `ContextBuilder` a inclusão do conteúdo na mensagem `system`, junto da identidade estável do Aska. O histórico da sessão segue em mensagens separadas com papéis `user` e `assistant`, inclusive quando as memórias vêm de execuções anteriores. No CLI, `app.py` mantém o loop, o despacho de alto nível e o composition root; `NaturalMemoryHandler` coordena detecção, interpretação, seleção, confirmação e apresentação dos fluxos naturais específicos da interface.
 - Das memórias, somente `content` é enviado ao modelo; IDs e metadados permanecem locais por padrão.
 
 ## Transparência e controle
 
 O usuário deve poder listar, pesquisar, editar e excluir memórias, marcá-las como temporárias ou permanentes e desativar a captura automática. Listagem, pesquisa, edição e exclusão explícitas estão implementadas; temporalidade e configuração de captura automática continuam pendentes.
 
-## Limitações atuais
+## Limitações atuais e evoluções planejadas
 
 - Todas as memórias salvas são enviadas em todas as requisições ao modelo; não há seleção por relevância.
 - O conteúdo das memórias ainda é serializado como uma lista textual dentro da mensagem `system`; a estrutura e os metadados persistidos não são expostos ao modelo.
-- Não há compactação, orçamento de tokens, tipos avançados ou explicabilidade além da origem e das datas mínimas.
+- A prevenção de duplicatas cobre equivalência textual superficial, não equivalência semântica nem detecção de contradições; essas evoluções permanecem `planned`.
+- Tipos de memória e `subjects` estruturados permanecem `planned`.
+- Seleção por relevância, orçamento de contexto e compactação permanecem `planned`.
+- Temporalidade e captura automática configurável permanecem `planned`.
 - A interpretação por modelo está limitada às propostas de alteração do nome e criação, edição ou exclusão explícita de uma memória, sem tool calling. JSON inválido, campos ou ações desconhecidos e conteúdo vazio são rejeitados sem produzir proposta. Captura automática e ações de memória mais amplas permanecem `planned`.
 - A interface atual é o CLI, mas detecção e representação da proposta não dependem dele e poderão ser reutilizadas por voz no futuro.
 - O histórico da sessão continua separado e apenas em memória durante a execução atual.
-- JSON continua sendo o armazenamento atual. SQLite é uma evolução provável quando consultas, volume ou atomicidade justificarem a mudança, mas ainda não foi adotado.
+- JSON continua sendo o armazenamento atual. SQLite permanece `planned` e só será considerado quando consultas, volume, concorrência ou atomicidade justificarem a mudança.
+- Busca vetorial permanece `planned` e só deve ser introduzida se uma necessidade concreta de recuperação justificar sua complexidade.
 - O cache do `JsonMemoryDataSource` assume que a instância do CLI é a responsável pelas alterações durante sua execução; mudanças externas no arquivo não são recarregadas automaticamente.
 
 ## Dependências implementadas

@@ -4,7 +4,7 @@ Aska é uma IA pessoal local, conversacional e progressivamente multimodal. O pr
 
 ## Estado atual
 
-O CLI conversa com o modelo local por meio do Ollama, mantém o histórico da sessão e oferece memória persistente explícita em JSON com listagem, busca, edição e exclusão. Persistent Memory permanece `in_progress`; capabilities de ferramentas e automação continuam `planned`.
+O CLI conversa com o modelo local por meio do Ollama, mantém o histórico da sessão e oferece memória persistente explícita em JSON com listagem, busca, criação, edição e exclusão. Persistent Memory está `implemented`; capabilities de ferramentas e automação continuam `planned` e ainda não possuem fase em andamento.
 
 Veja o [estado detalhado e roadmap](docs/project/roadmap.md).
 

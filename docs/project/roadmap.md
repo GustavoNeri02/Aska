@@ -2,7 +2,7 @@
 
 ## Estado atual
 
-**Fase atual:** evolução do CLI com Session Context implementado e Persistent Memory em progresso.
+**Fase atual:** nenhuma fase está em andamento. Persistent Memory foi concluída, e Tools and capabilities permanece `planned` até a definição de seu primeiro incremento.
 
 **Última Sprint concluída:** Sprint 1 — primeiro CLI do Aska
 
@@ -36,21 +36,23 @@
 
 - Session Context está implementado e usa histórico em memória com papéis `user` e `assistant` durante a conversa atual; a identidade mínima do Aska é enviada como mensagem `system`.
 - A orquestração de conversa e a construção de contexto estão separadas do CLI; entradas do terminal são convertidas em comandos tipados antes da execução.
-- Persistent Memory está `in_progress` e já suporta persistência JSON estruturada com identidade e metadados mínimos, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
+- Persistent Memory está `implemented` com persistência JSON estruturada, identidade e metadados mínimos, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
 - O fluxo natural está implementado para alteração do nome e criação, edição ou exclusão explícita de uma memória. Padrões exatos evitam chamadas ao modelo quando disponíveis e gates separados limitam a interpretação de paráfrases; o modelo apenas propõe, enquanto seleção, confirmação e persistência permanecem locais. Captura automática e pedidos genéricos mais amplos continuam `planned`.
 - O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.
 
-### Incremento atual de memória explícita
+### Escopo concluído da Fase 3
 
-O incremento atual de Persistent Memory implementa exclusivamente objetos com `id`, `content`, `source`, `created_at` e `updated_at` em JSON. O CLI continua expondo os comandos atuais, aceita criação natural explícita com confirmação e envia somente o conteúdo das memórias ao modelo. JSON permanece como armazenamento atual.
+Persistent Memory usa objetos com `id`, `content`, `source`, `created_at` e `updated_at` em JSON local. Repository e datasource permanecem separados; gravações são atômicas e falhas de persistência são explícitas. O usuário pode listar, buscar, criar, editar e excluir memórias por comandos literais ou por propostas naturais confirmadas, com proteção por ID e snapshot quando aplicável. A prevenção de duplicatas cobre equivalência textual superficial sem alterar o conteúdo persistido. Somente o conteúdo das memórias entra no contexto do modelo. O comportamento possui testes automatizados e a integração local foi validada ponta a ponta com Gemma 3 12B.
 
-### Limitações atuais do incremento
+### Limitações e evoluções planejadas
 
-- Todas as memórias salvas são enviadas em todas as requisições ao modelo.
-- Não há seleção por relevância, compactação ou orçamento de tokens.
-- JSON continua sendo o armazenamento atual; SQLite é uma evolução provável, ainda não adotada.
-- O datasource JSON usa cache por instância e escrita atômica, mas ainda assume um único writer durante a execução. `SqliteMemoryDataSource` permanece `planned`.
-- Tipos avançados, seleção semântica e explicabilidade além dos metadados mínimos continuam pendentes.
+- A prevenção atual reconhece equivalência textual, não equivalência de significado; equivalência semântica e detecção de contradições permanecem `planned`.
+- Tipos de memória e `subjects` estruturados permanecem `planned`.
+- Seleção por relevância, orçamento de contexto e compactação permanecem `planned`; atualmente todas as memórias são enviadas ao modelo.
+- Temporalidade e captura automática configurável permanecem `planned`.
+- JSON continua sendo o armazenamento implementado; SQLite será considerado somente quando houver necessidade concreta.
+- Busca vetorial permanece `planned` e só deve ser adotada se uma necessidade de recuperação justificar sua complexidade.
+- O datasource JSON usa cache por instância e assume um único writer durante a execução.
 
 ## Roadmap
 
@@ -59,7 +61,7 @@ O incremento atual de Persistent Memory implementa exclusivamente objetos com `i
 | 0 | Foundation | Setup, monorepo, documentação e qualidade | `implemented` |
 | 1 | CLI and local conversation | CLI e primeira conversa com modelo local substituível | `implemented` |
 | 2 | Session context | Histórico e contexto útil na sessão | `implemented` |
-| 3 | Persistent memory | Memória local transparente e consultável | `in_progress` |
+| 3 | Persistent memory | Memória local transparente e consultável | `implemented` |
 | 4 | Tools and capabilities | Registro seguro e primeira capability | `planned` |
 | 5 | Knowledge and retrieval | Indexação de documentos, código e informações | `planned` |
 | 6 | Desktop interaction | Recursos do computador com permissões e auditoria | `planned` |
