@@ -96,7 +96,8 @@ class ReadTextFileCapability:
         try:
             if resolved_path.stat().st_size > self._max_bytes:
                 return ReadTextFileResult(ReadTextFileStatus.TOO_LARGE)
-            raw_content = resolved_path.read_bytes()
+            with resolved_path.open("rb") as file:
+                raw_content = file.read(self._max_bytes + 1)
         except OSError:
             return ReadTextFileResult(ReadTextFileStatus.READ_FAILED)
 

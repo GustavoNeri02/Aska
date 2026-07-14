@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -117,6 +118,52 @@ def test_capability_rejects_binary_empty_and_oversized_files(tmp_path: Path) -> 
         assert capability.read(path).status is expected_status
 
 
+def test_capability_never_reads_more_than_limit_plus_one_byte(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = (tmp_path / "workspace").resolve()
+    workspace.mkdir()
+    target = workspace / "large.txt"
+    payload = b"a" * 100
+    target.write_bytes(payload)
+    requested_sizes: list[int] = []
+    real_stat = Path.stat
+
+    def report_small_size(path: Path, *args: object, **kwargs: object) -> os.stat_result:
+        result = real_stat(path, *args, **kwargs)
+        if path == target:
+            values = list(result)
+            values[6] = 0
+            return os.stat_result(values)
+        return result
+
+    class TrackedBinaryFile:
+        def __enter__(self) -> "TrackedBinaryFile":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self, size: int = -1) -> bytes:
+            requested_sizes.append(size)
+            return payload[:size]
+
+    def open_tracked(path: Path, mode: str) -> TrackedBinaryFile:
+        assert path == target
+        assert mode == "rb"
+        return TrackedBinaryFile()
+
+    monkeypatch.setattr(Path, "stat", report_small_size)
+    monkeypatch.setattr(Path, "open", open_tracked)
+
+    result = ReadTextFileCapability(workspace, max_bytes=10).read("large.txt")
+
+    assert result.status is ReadTextFileStatus.TOO_LARGE
+    assert requested_sizes == [11]
+    assert requested_sizes[0] < len(payload)
+
+
 def test_capability_rejects_non_utf8_content(tmp_path: Path) -> None:
     workspace = (tmp_path / "workspace").resolve()
     workspace.mkdir()
@@ -135,11 +182,11 @@ def test_capability_returns_typed_read_failure(
     workspace.mkdir()
     (workspace / "file.txt").write_text("conteúdo", encoding="utf-8")
 
-    def fail_read(path: Path) -> bytes:
-        del path
+    def fail_open(path: Path, *args: object, **kwargs: object) -> object:
+        del path, args, kwargs
         raise OSError("falha simulada")
 
-    monkeypatch.setattr(Path, "read_bytes", fail_read)
+    monkeypatch.setattr(Path, "open", fail_open)
 
     result = ReadTextFileCapability(workspace).read("file.txt")
 

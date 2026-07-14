@@ -109,6 +109,15 @@ def run_conversation_loop(
 
 
 def main() -> None:
+    try:
+        workspace_root = Path(os.getenv("ASKA_WORKSPACE_ROOT", str(Path.cwd()))).resolve(
+            strict=True
+        )
+        file_reader = ReadTextFileCapability(workspace_root)
+    except (OSError, ValueError):
+        print("Aska > Workspace de leitura inválido.")
+        return
+
     model = os.getenv("ASKA_MODEL", "gemma3:12b")
     model_provider = OllamaProvider(
         model=model,
@@ -118,8 +127,6 @@ def main() -> None:
     memory_repository = LocalMemoryRepository(memory_data_source)
     memory_service = MemoryService(memory_repository)
     memory_intent_interpreter = ModelMemoryIntentInterpreter(model_provider)
-    workspace_root = Path(os.getenv("ASKA_WORKSPACE_ROOT", str(Path.cwd()))).resolve()
-    file_reader = ReadTextFileCapability(workspace_root)
     file_intent_interpreter = ModelFileIntentInterpreter(model_provider)
 
     try:

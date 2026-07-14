@@ -109,3 +109,35 @@ def test_main_configures_file_reader_with_allowed_workspace(
     assert isinstance(file_reader, ReadTextFileCapability)
     assert file_reader.read("README.md").content == "contexto"
     assert configured["file_intent_interpreter"] is not None
+
+
+@pytest.mark.parametrize("workspace_kind", ["missing", "file"])
+def test_main_reports_invalid_workspace_without_starting_conversation(
+    workspace_kind: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    workspace = tmp_path / workspace_kind
+    if workspace_kind == "file":
+        workspace.write_text("not a directory", encoding="utf-8")
+    conversation_started = False
+    warm_up_started = False
+
+    def start_conversation(*args: object, **kwargs: object) -> None:
+        nonlocal conversation_started
+        conversation_started = True
+
+    def warm_up(self: object) -> None:
+        nonlocal warm_up_started
+        warm_up_started = True
+
+    monkeypatch.setenv("ASKA_WORKSPACE_ROOT", str(workspace))
+    monkeypatch.setattr("apps.cli.app.OllamaProvider.warm_up", warm_up)
+    monkeypatch.setattr("apps.cli.app.run_conversation_loop", start_conversation)
+
+    main()
+
+    assert "Aska > Workspace de leitura inválido." in capsys.readouterr().out
+    assert warm_up_started is False
+    assert conversation_started is False
