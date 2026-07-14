@@ -11,7 +11,7 @@ from apps.cli.handlers import (
     handle_memory_command,
 )
 from apps.cli.loading import run_with_loading
-from capabilities.filesystem import ReadTextFileCapability
+from capabilities.filesystem import ListFilesCapability, ReadTextFileCapability
 from packages.conversation import (
     ConversationService,
     FileIntentInterpreter,
@@ -44,6 +44,7 @@ def run_conversation_loop(
     memory_service: MemoryService,
     memory_intent_interpreter: MemoryIntentInterpreter | None = None,
     file_reader: ReadTextFileCapability | None = None,
+    file_lister: ListFilesCapability | None = None,
     file_intent_interpreter: FileIntentInterpreter | None = None,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
@@ -66,6 +67,7 @@ def run_conversation_loop(
             file_intent_interpreter,
             conversation_service,
             output_writer,
+            file_lister,
         )
         if file_reader is not None and file_intent_interpreter is not None
         else None
@@ -114,6 +116,7 @@ def main() -> None:
             strict=True
         )
         file_reader = ReadTextFileCapability(workspace_root)
+        file_lister = ListFilesCapability(workspace_root)
     except (OSError, ValueError):
         print("Aska > Workspace de leitura inválido.")
         return
@@ -140,6 +143,7 @@ def main() -> None:
             memory_service=memory_service,
             memory_intent_interpreter=memory_intent_interpreter,
             file_reader=file_reader,
+            file_lister=file_lister,
             file_intent_interpreter=file_intent_interpreter,
         )
     finally:

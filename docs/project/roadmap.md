@@ -2,7 +2,7 @@
 
 ## Estado atual
 
-**Fase atual:** Tools and capabilities está `in_progress` com o primeiro incremento vertical de leitura textual confinada ao workspace.
+**Fase atual:** Tools and capabilities está `in_progress` com operações read-only confinadas ao workspace para ler um arquivo conhecido e descobrir caminhos.
 
 **Última Sprint concluída:** Sprint 1 — primeiro CLI do Aska
 
@@ -31,7 +31,7 @@
 - Mudanças naturais do nome de Gustavo usam padrões determinísticos ou interpretação limitada por modelo para gerar uma proposta; confirmação e edição por ID e snapshot permanecem locais.
 - Pedidos naturais explícitos de memorização usam padrões determinísticos ou interpretação limitada por modelo para gerar uma proposta; somente a confirmação local aciona `MemoryService.add()`.
 - Pedidos naturais explícitos de exclusão selecionam candidatas localmente e somente a confirmação aciona exclusão por ID e snapshot.
-- Pedidos naturais explícitos de leitura de arquivo passam por gate e interpretação estruturada; caminho, permissão e leitura são validados localmente antes de o conteúdo entrar como contexto temporário.
+- Pedidos com caminho explícito usam extração determinística; variações naturais de leitura e pedidos de descoberta passam por gate e interpretação estruturada. Caminhos, permissões e acesso são validados localmente antes de o contexto temporário ser criado.
 
 ### Comportamento atual
 
@@ -40,11 +40,11 @@
 - Persistent Memory está `implemented` com persistência JSON estruturada, identidade e metadados mínimos, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
 - O fluxo natural está implementado para alteração do nome e criação, edição ou exclusão explícita de uma memória. Padrões exatos evitam chamadas ao modelo quando disponíveis e gates separados limitam a interpretação de paráfrases; o modelo apenas propõe, enquanto seleção, confirmação e persistência permanecem locais. Captura automática e pedidos genéricos mais amplos continuam `planned`.
 - O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.
-- A primeira capability lê um único arquivo UTF-8 de até 64 KiB dentro do workspace configurado por `ASKA_WORKSPACE_ROOT`; o conteúdo não entra no histórico e é tratado como dado não confiável.
+- As capabilities de filesystem leem um único arquivo UTF-8 conhecido de até 64 KiB ou listam caminhos com profundidade e quantidade limitadas dentro de `ASKA_WORKSPACE_ROOT`; conteúdo e listagens não entram no histórico e são tratados como dados não confiáveis.
 
 ### Incremento atual da Fase 4
 
-O primeiro incremento de Tools and capabilities está `implemented`: um pedido natural pode propor a leitura de um único arquivo textual, mas o modelo produz somente uma intenção com caminho. `ReadTextFileCapability` aplica confinamento local ao workspace, inclusive após resolução de symlinks, e retorna resultados tipados; `NaturalFileReadHandler` fornece o conteúdo em uma mensagem `user` separada somente à resposta atual. Não há tool calling, execução arbitrária, escrita, listagem de diretórios, leitura binária, múltiplos arquivos, registry ou manifesto genérico de capabilities.
+O recorte read-only atual de Tools and capabilities está `implemented`: `ReadTextFileCapability` lê um arquivo textual conhecido, e `ListFilesCapability` descobre caminhos relativos sem ler conteúdo. Ambas aplicam confinamento local ao workspace e retornam resultados tipados; a listagem também limita profundidade e resultados e ignora diretórios de infraestrutura conhecidos. `NaturalFileReadHandler` fornece o conteúdo ou a listagem em uma mensagem `user` separada somente à resposta atual. Não há tool calling, execução arbitrária, escrita, leitura automática de múltiplos arquivos, busca pelo conteúdo, registry ou manifesto genérico de capabilities; esses recursos continuam `planned` quando aplicável.
 
 ### Escopo concluído da Fase 3
 
@@ -68,7 +68,7 @@ Persistent Memory usa objetos com `id`, `content`, `source`, `created_at` e `upd
 | 1 | CLI and local conversation | CLI e primeira conversa com modelo local substituível | `implemented` |
 | 2 | Session context | Histórico e contexto útil na sessão | `implemented` |
 | 3 | Persistent memory | Memória local transparente e consultável | `implemented` |
-| 4 | Tools and capabilities | Registro seguro e primeira capability | `in_progress` |
+| 4 | Tools and capabilities | Capabilities seguras e incrementais | `in_progress` |
 | 5 | Knowledge and retrieval | Indexação de documentos, código e informações | `planned` |
 | 6 | Desktop interaction | Recursos do computador com permissões e auditoria | `planned` |
 | 7 | Vision | Captura e interpretação de tela e imagens | `planned` |

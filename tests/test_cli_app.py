@@ -5,7 +5,7 @@ import pytest
 
 from apps.cli.app import build_banner, main
 from apps.cli.loading import run_with_loading
-from capabilities.filesystem import ReadTextFileCapability
+from capabilities.filesystem import ListFilesCapability, ReadTextFileCapability
 from packages.conversation import ModelProviderError
 
 
@@ -108,6 +108,7 @@ def test_main_configures_file_reader_with_allowed_workspace(
     file_reader = configured["file_reader"]
     assert isinstance(file_reader, ReadTextFileCapability)
     assert file_reader.read("README.md").content == "contexto"
+    assert isinstance(configured["file_lister"], ListFilesCapability)
     assert configured["file_intent_interpreter"] is not None
 
 

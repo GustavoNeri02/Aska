@@ -7,9 +7,12 @@ from packages.conversation.model import (
     ModelRole,
 )
 from packages.conversation.natural_file import (
+    FileIntent,
     FileIntentInterpreter,
+    ListFilesIntent,
     ModelFileIntentInterpreter,
     ReadTextFileIntent,
+    detect_explicit_file_read,
     should_interpret_file_read,
 )
 from packages.conversation.natural_memory import (
@@ -46,7 +49,9 @@ __all__ = [
     "ContextDocument",
     "ConversationService",
     "ConversationTurn",
+    "FileIntent",
     "FileIntentInterpreter",
+    "ListFilesIntent",
     "ModelProvider",
     "ModelProviderError",
     "ModelMessage",
@@ -64,6 +69,7 @@ __all__ = [
     "detect_memory_add",
     "detect_memory_delete",
     "detect_name_change",
+    "detect_explicit_file_read",
     "find_name_memory_candidates",
     "should_interpret_memory_add",
     "should_interpret_memory_delete",

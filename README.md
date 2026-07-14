@@ -4,7 +4,7 @@ Aska é uma IA pessoal local, conversacional e progressivamente multimodal. O pr
 
 ## Estado atual
 
-O CLI conversa com o modelo local por meio do Ollama, mantém o histórico da sessão, oferece memória persistente explícita em JSON e pode ler com segurança um arquivo textual dentro do workspace para usá-lo como contexto temporário. Persistent Memory está `implemented`; Tools and capabilities está `in_progress` somente com esse primeiro incremento de leitura.
+O CLI conversa com o modelo local por meio do Ollama, mantém o histórico da sessão, oferece memória persistente explícita em JSON e pode ler um arquivo textual conhecido ou descobrir caminhos de arquivos com segurança dentro do workspace. Conteúdo e listagens são usados somente como contexto temporário. Persistent Memory está `implemented`; Tools and capabilities está `in_progress` com esse recorte read-only.
 
 Veja o [estado detalhado e roadmap](docs/project/roadmap.md).
 
