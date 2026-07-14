@@ -66,9 +66,9 @@ Pedidos explícitos de alteração de uma memória ou informação passam por ga
 
 ### Leitura textual confinada ao workspace — `implemented`
 
-A primeira capability permite ler um único arquivo textual UTF-8 de até 64 KiB dentro de um workspace explicitamente configurado no composition root por `ASKA_WORKSPACE`, usando o diretório atual como padrão. Um gate local evita interpretação adicional em mensagens comuns; quando acionado, `ModelFileIntentInterpreter` aceita somente JSON estrito com uma ação `read_text_file` e um caminho. O modelo não recebe conteúdo prévio, não acessa o filesystem e não concede permissões.
+A primeira capability permite ler um único arquivo textual UTF-8 de até 64 KiB dentro de um workspace explicitamente configurado e resolvido no composition root por `ASKA_WORKSPACE_ROOT`, usando o diretório atual como padrão. Um gate local evita interpretação adicional em mensagens comuns; quando acionado, `ModelFileIntentInterpreter` aceita somente JSON estrito com uma ação `read_text_file` e um caminho. O modelo não recebe conteúdo prévio, não acessa o filesystem e não concede permissões.
 
-`TextFileReader`, em `capabilities/filesystem`, resolve o caminho localmente e rejeita caminhos absolutos, travessia, symlinks que escapem do workspace, diretórios, arquivos ausentes, vazios, binários, não UTF-8 ou acima do limite. `NaturalFileReadHandler` coordena esse fluxo específico no CLI e entrega o resultado a `ConversationService` como contexto temporário marcado como dado não confiável; o conteúdo não entra no histórico. Não foi criado registry, planner, tool calling ou abstração genérica de capabilities.
+`ReadTextFileCapability`, em `capabilities/filesystem`, retorna resultados tipados e resolve o caminho localmente, rejeitando `file://`, caminhos absolutos POSIX ou Windows, travessia, symlinks que escapem do workspace, diretórios, arquivos ausentes, vazios, binários, não UTF-8 ou acima do limite. `NaturalFileReadHandler` coordena esse fluxo específico no CLI e entrega o resultado a `ConversationService` em uma mensagem `user` temporária marcada como dado não confiável; o conteúdo não altera a identidade em `system` nem entra no histórico. Não foi criado registry, manifesto, planner, tool calling ou abstração genérica de capabilities.
 
 ## Decisões substituídas, rejeitadas ou adiadas
 

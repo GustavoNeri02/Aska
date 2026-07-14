@@ -34,7 +34,7 @@ O endereço do Ollama também pode ser alterado com `ASKA_OLLAMA_URL`.
 O workspace permitido para leitura de arquivos usa o diretório atual por padrão e pode ser configurado explicitamente:
 
 ```powershell
-$env:ASKA_WORKSPACE = "D:\Projetos\Aska"
+$env:ASKA_WORKSPACE_ROOT = "D:\Projetos\Aska"
 ```
 
 ## Executar

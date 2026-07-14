@@ -24,8 +24,12 @@ class StaticProvider:
     "message",
     [
         "Leia AGENTS.md e resuma as instruções principais.",
+        "Quero ler AGENTS.md.",
         "Abra o arquivo docs/README.md e explique.",
+        "Pode abrir pyproject.toml?",
         "Consulte pyproject.toml para responder.",
+        "Quero consultar docs/README.md.",
+        "Veja o arquivo AGENTS.md.",
     ],
 )
 def test_file_read_gate_accepts_explicit_requests(message: str) -> None:
@@ -37,6 +41,10 @@ def test_file_read_gate_accepts_explicit_requests(message: str) -> None:
     [
         "Como arquivos funcionam em Python?",
         "Leia isso para mim.",
+        "Leia minha mensagem.",
+        "Abra sua mente.",
+        "Consulte sua memória.",
+        "Veja o arquivo.",
         "O AGENTS.md é importante?",
         "Leia AGENTS.md\ne README.md.",
     ],
@@ -62,6 +70,7 @@ def test_model_file_interpreter_returns_typed_intent() -> None:
     [
         '{"action":"none"}',
         '```json\n{"action":"read_text_file","path":"AGENTS.md"}\n```',
+        'Texto {"action":"read_text_file","path":"AGENTS.md"}',
         '{"action":"read_text_file","path":"AGENTS.md","extra":true}',
         '{"action":"read_text_file","path":""}',
         '{"action":"read_text_file","path":42}',

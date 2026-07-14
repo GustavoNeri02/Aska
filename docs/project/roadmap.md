@@ -40,11 +40,11 @@
 - Persistent Memory está `implemented` com persistência JSON estruturada, identidade e metadados mínimos, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
 - O fluxo natural está implementado para alteração do nome e criação, edição ou exclusão explícita de uma memória. Padrões exatos evitam chamadas ao modelo quando disponíveis e gates separados limitam a interpretação de paráfrases; o modelo apenas propõe, enquanto seleção, confirmação e persistência permanecem locais. Captura automática e pedidos genéricos mais amplos continuam `planned`.
 - O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.
-- A primeira capability lê um único arquivo UTF-8 de até 64 KiB dentro do workspace configurado por `ASKA_WORKSPACE`; o conteúdo não entra no histórico e é tratado como dado não confiável.
+- A primeira capability lê um único arquivo UTF-8 de até 64 KiB dentro do workspace configurado por `ASKA_WORKSPACE_ROOT`; o conteúdo não entra no histórico e é tratado como dado não confiável.
 
 ### Incremento atual da Fase 4
 
-O primeiro incremento de Tools and capabilities está `implemented`: um pedido natural pode propor a leitura de um único arquivo textual, mas o modelo produz somente uma intenção com caminho. `TextFileReader` aplica confinamento local ao workspace, inclusive após resolução de symlinks, e `NaturalFileReadHandler` fornece o conteúdo somente à resposta atual. Não há tool calling, execução arbitrária, escrita, listagem de diretórios, leitura binária, múltiplos arquivos ou registry genérico de capabilities.
+O primeiro incremento de Tools and capabilities está `implemented`: um pedido natural pode propor a leitura de um único arquivo textual, mas o modelo produz somente uma intenção com caminho. `ReadTextFileCapability` aplica confinamento local ao workspace, inclusive após resolução de symlinks, e retorna resultados tipados; `NaturalFileReadHandler` fornece o conteúdo em uma mensagem `user` separada somente à resposta atual. Não há tool calling, execução arbitrária, escrita, listagem de diretórios, leitura binária, múltiplos arquivos, registry ou manifesto genérico de capabilities.
 
 ### Escopo concluído da Fase 3
 

@@ -1,10 +1,10 @@
 from packages.conversation.context import ContextBuilder
 from packages.conversation.identity import ASKA_IDENTITY
 from packages.conversation.model import (
+    ContextDocument,
     ConversationTurn,
     ModelMessage,
     ModelRole,
-    TemporaryContext,
 )
 from packages.conversation.natural_file import (
     FileIntentInterpreter,
@@ -43,6 +43,7 @@ __all__ = [
     "DeleteMemoryIntent",
     "EditMemoryIntent",
     "ContextBuilder",
+    "ContextDocument",
     "ConversationService",
     "ConversationTurn",
     "FileIntentInterpreter",
@@ -59,7 +60,6 @@ __all__ = [
     "PendingMemoryDelete",
     "PendingMemoryEdit",
     "ReadTextFileIntent",
-    "TemporaryContext",
     "canonical_name_memory",
     "detect_memory_add",
     "detect_memory_delete",

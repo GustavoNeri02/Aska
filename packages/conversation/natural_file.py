@@ -6,8 +6,14 @@ from typing import Protocol
 from packages.conversation.model import ModelMessage, ModelRole
 from packages.conversation.provider import ModelProvider
 
-_FILE_READ_VERB = re.compile(r"\b(?:leia|abra|consulte)\b", re.IGNORECASE)
-_FILE_REFERENCE = re.compile(r"(?:\barquivo\b|[^\s]+\.[^\s]+)", re.IGNORECASE)
+_FILE_READ_VERB = re.compile(
+    r"\b(?:leia|ler|abra|abrir|consulte|consultar)\b|\bveja\s+o\s+arquivo\b",
+    re.IGNORECASE,
+)
+_FILE_REFERENCE = re.compile(
+    r"(?:[^\s/\\]+[/\\])*[^\s/\\]+\.[^\s/\\.,;:!?]+",
+    re.IGNORECASE,
+)
 _INTERPRETER_INSTRUCTION = "\n".join(
     (
         "Apenas classifique o pedido. Não responda ao usuário e não leia arquivos.",

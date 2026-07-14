@@ -27,12 +27,12 @@ class ConversationTurn:
 
 
 @dataclass(frozen=True, slots=True)
-class TemporaryContext:
+class ContextDocument:
     source: str
     content: str
 
     def __post_init__(self) -> None:
         if not self.source.strip():
-            raise ValueError("temporary context source cannot be empty")
+            raise ValueError("context document source cannot be empty")
         if not self.content.strip():
-            raise ValueError("temporary context content cannot be empty")
+            raise ValueError("context document content cannot be empty")

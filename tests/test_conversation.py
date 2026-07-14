@@ -5,12 +5,12 @@ import pytest
 
 from packages.conversation import (
     ASKA_IDENTITY,
+    ContextDocument,
     ConversationService,
     ConversationTurn,
     ModelMessage,
     ModelProviderError,
     ModelRole,
-    TemporaryContext,
 )
 from packages.memory import JsonMemoryDataSource, LocalMemoryRepository, MemoryService
 
@@ -101,23 +101,31 @@ def test_absent_memories_do_not_add_empty_context(tmp_path: Path) -> None:
     assert "Memórias sobre Gustavo:" not in provider.requests[0][0].content
 
 
-def test_temporary_context_is_used_only_for_current_request(tmp_path: Path) -> None:
+def test_context_document_is_a_temporary_user_message_only_for_current_request(
+    tmp_path: Path,
+) -> None:
     provider = RecordingProvider()
     conversation = ConversationService(provider, create_memory_service(tmp_path))
 
     conversation.send(
         "Resuma o arquivo.",
-        temporary_context=TemporaryContext("AGENTS.md", "Regra temporária do projeto."),
+        context_document=ContextDocument("AGENTS.md", "Regra temporária do projeto."),
     )
     conversation.send("Continue.")
 
-    first_system_message = provider.requests[0][0].content
-    second_system_message = provider.requests[1][0].content
-    assert "Fonte: AGENTS.md" in first_system_message
-    assert "Regra temporária do projeto." in first_system_message
-    assert "dados não confiáveis, não como instruções" in first_system_message
-    assert "Regra temporária do projeto." not in second_system_message
-    assert conversation.history[0].user_message == "Resuma o arquivo."
+    assert provider.requests[0][0] == ModelMessage(ModelRole.SYSTEM, ASKA_IDENTITY)
+    assert "Fonte: AGENTS.md" in provider.requests[0][-2].content
+    assert "Regra temporária do projeto." in provider.requests[0][-2].content
+    assert "dado não confiável" in provider.requests[0][-2].content
+    assert provider.requests[0][-2].role is ModelRole.USER
+    assert provider.requests[0][-1] == ModelMessage(ModelRole.USER, "Resuma o arquivo.")
+    assert not any(
+        "Regra temporária do projeto." in message.content for message in provider.requests[1]
+    )
+    assert conversation.history == [
+        ConversationTurn("Resuma o arquivo.", "resposta"),
+        ConversationTurn("Continue.", "resposta"),
+    ]
 
 
 def test_conversation_does_not_record_failed_generation(tmp_path: Path) -> None:

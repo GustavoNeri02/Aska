@@ -1,15 +1,14 @@
 from collections.abc import Callable
 
 from capabilities.filesystem import (
-    TextFileReader,
-    TextFileReadError,
-    TextFileReadErrorCode,
+    ReadTextFileCapability,
+    ReadTextFileStatus,
 )
 from packages.conversation import (
+    ContextDocument,
     ConversationService,
     FileIntentInterpreter,
     ReadTextFileIntent,
-    TemporaryContext,
     should_interpret_file_read,
 )
 
@@ -17,7 +16,7 @@ from packages.conversation import (
 class NaturalFileReadHandler:
     def __init__(
         self,
-        file_reader: TextFileReader,
+        file_reader: ReadTextFileCapability,
         file_intent_interpreter: FileIntentInterpreter,
         conversation_service: ConversationService,
         output_writer: Callable[[str], None],
@@ -35,34 +34,35 @@ class NaturalFileReadHandler:
         if not isinstance(intent, ReadTextFileIntent):
             return False
 
-        try:
-            file_content = self._file_reader.read(intent.path)
-        except TextFileReadError as error:
-            self._output_writer(_read_error_message(error.code))
+        result = self._file_reader.read(intent.path)
+        if result.status is not ReadTextFileStatus.SUCCESS:
+            self._output_writer(_read_error_message(result.status))
             return True
 
+        if result.relative_path is None or result.content is None:
+            raise RuntimeError("successful file read returned no content")
         response = self._conversation_service.send(
             user_input,
-            temporary_context=TemporaryContext(
-                source=file_content.relative_path,
-                content=file_content.content,
+            context_document=ContextDocument(
+                source=result.relative_path,
+                content=result.content,
             ),
         )
         self._output_writer(f"Aska > {response}")
         return True
 
 
-def _read_error_message(code: TextFileReadErrorCode) -> str:
+def _read_error_message(status: ReadTextFileStatus) -> str:
     messages = {
-        TextFileReadErrorCode.INVALID_PATH: "O caminho informado não é válido.",
-        TextFileReadErrorCode.OUTSIDE_WORKSPACE: (
+        ReadTextFileStatus.INVALID_PATH: "O caminho informado não é válido.",
+        ReadTextFileStatus.OUTSIDE_WORKSPACE: (
             "Acesso negado: o arquivo deve estar dentro do workspace permitido."
         ),
-        TextFileReadErrorCode.NOT_FOUND: "O arquivo informado não foi encontrado.",
-        TextFileReadErrorCode.NOT_FILE: "O caminho informado não aponta para um arquivo.",
-        TextFileReadErrorCode.TOO_LARGE: "O arquivo excede o limite de leitura permitido.",
-        TextFileReadErrorCode.NOT_TEXT: "O arquivo não é um texto UTF-8 válido.",
-        TextFileReadErrorCode.EMPTY: "O arquivo está vazio.",
-        TextFileReadErrorCode.UNREADABLE: "Não foi possível ler o arquivo informado.",
+        ReadTextFileStatus.NOT_FOUND: "O arquivo informado não foi encontrado.",
+        ReadTextFileStatus.NOT_FILE: "O caminho informado não aponta para um arquivo.",
+        ReadTextFileStatus.TOO_LARGE: "O arquivo excede o limite de leitura permitido.",
+        ReadTextFileStatus.NOT_TEXT: "O arquivo não é um texto UTF-8 válido.",
+        ReadTextFileStatus.EMPTY: "O arquivo está vazio.",
+        ReadTextFileStatus.READ_FAILED: "Não foi possível ler o arquivo informado.",
     }
-    return messages[code]
+    return messages[status]

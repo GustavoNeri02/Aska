@@ -11,7 +11,7 @@ from apps.cli.handlers import (
     handle_memory_command,
 )
 from apps.cli.loading import run_with_loading
-from capabilities.filesystem import TextFileReader
+from capabilities.filesystem import ReadTextFileCapability
 from packages.conversation import (
     ConversationService,
     FileIntentInterpreter,
@@ -43,7 +43,7 @@ def run_conversation_loop(
     model_provider: ModelProvider,
     memory_service: MemoryService,
     memory_intent_interpreter: MemoryIntentInterpreter | None = None,
-    file_reader: TextFileReader | None = None,
+    file_reader: ReadTextFileCapability | None = None,
     file_intent_interpreter: FileIntentInterpreter | None = None,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
@@ -118,8 +118,8 @@ def main() -> None:
     memory_repository = LocalMemoryRepository(memory_data_source)
     memory_service = MemoryService(memory_repository)
     memory_intent_interpreter = ModelMemoryIntentInterpreter(model_provider)
-    workspace_root = Path(os.getenv("ASKA_WORKSPACE", str(Path.cwd())))
-    file_reader = TextFileReader(workspace_root)
+    workspace_root = Path(os.getenv("ASKA_WORKSPACE_ROOT", str(Path.cwd()))).resolve()
+    file_reader = ReadTextFileCapability(workspace_root)
     file_intent_interpreter = ModelFileIntentInterpreter(model_provider)
 
     try:

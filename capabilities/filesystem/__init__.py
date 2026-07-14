@@ -1,13 +1,11 @@
 from capabilities.filesystem.reader import (
-    TextFileContent,
-    TextFileReader,
-    TextFileReadError,
-    TextFileReadErrorCode,
+    ReadTextFileCapability,
+    ReadTextFileResult,
+    ReadTextFileStatus,
 )
 
 __all__ = [
-    "TextFileContent",
-    "TextFileReadError",
-    "TextFileReadErrorCode",
-    "TextFileReader",
+    "ReadTextFileCapability",
+    "ReadTextFileResult",
+    "ReadTextFileStatus",
 ]
