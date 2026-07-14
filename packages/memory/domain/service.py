@@ -1,3 +1,5 @@
+import re
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
@@ -6,6 +8,14 @@ from uuid import UUID, uuid4
 
 from packages.memory.domain.model import Memory, MemorySource
 from packages.memory.domain.repository import MemoryRepository
+
+_CONSECUTIVE_WHITESPACE = re.compile(r"\s+")
+
+
+def _duplicate_key(content: str) -> str:
+    normalized = unicodedata.normalize("NFKC", content.strip())
+    normalized = _CONSECUTIVE_WHITESPACE.sub(" ", normalized).casefold()
+    return normalized.removesuffix(".")
 
 
 class AddMemoryStatus(StrEnum):
@@ -53,7 +63,8 @@ class MemoryService:
             return AddMemoryResult(AddMemoryStatus.INVALID)
 
         memories = self._repository.list()
-        if any(memory.content == normalized_content for memory in memories):
+        content_key = _duplicate_key(normalized_content)
+        if any(_duplicate_key(memory.content) == content_key for memory in memories):
             return AddMemoryResult(AddMemoryStatus.DUPLICATE)
 
         now = self._clock()
@@ -129,7 +140,11 @@ class MemoryService:
             return EditMemoryStatus.NOT_FOUND
         if new_value == current_value:
             return EditMemoryStatus.UNCHANGED
-        if any(memory.content == new_value for memory in memories):
+        new_key = _duplicate_key(new_value)
+        if any(
+            memory_index != index and _duplicate_key(memory.content) == new_key
+            for memory_index, memory in enumerate(memories)
+        ):
             return EditMemoryStatus.DUPLICATE
 
         updated_at = self._clock()
@@ -169,7 +184,11 @@ class MemoryService:
             return EditMemoryStatus.CONFLICT
         if new_value == current_memory.content:
             return EditMemoryStatus.UNCHANGED
-        if any(memory.content == new_value for memory in memories):
+        new_key = _duplicate_key(new_value)
+        if any(
+            memory_index != index and _duplicate_key(memory.content) == new_key
+            for memory_index, memory in enumerate(memories)
+        ):
             return EditMemoryStatus.DUPLICATE
 
         updated_at = self._clock()

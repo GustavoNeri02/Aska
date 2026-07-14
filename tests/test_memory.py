@@ -123,6 +123,20 @@ def test_duplicate_content_is_not_created(tmp_path: Path) -> None:
     assert memory_service.list() == [created]
 
 
+def test_duplicate_is_detected_after_reloading_json_without_rewriting_content(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "memories.json"
+    original = create_memory_service(path).add("Prefiro respostas longas.")
+
+    duplicate = create_memory_service(path).add("prefiro  respostas longas")
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+
+    assert original.status is AddMemoryStatus.ADDED
+    assert duplicate.status is AddMemoryStatus.DUPLICATE
+    assert [item["content"] for item in persisted] == ["Prefiro respostas longas."]
+
+
 def test_repository_reuses_loaded_memories_without_reading_json_again(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -45,6 +45,51 @@ def test_service_owns_creation_and_duplicate_rules() -> None:
     assert repository.memories == [created.memory]
 
 
+@pytest.mark.parametrize(
+    ("original", "duplicate"),
+    [
+        ("Prefiro respostas longas.", "Prefiro respostas longas."),
+        ("Prefiro respostas longas.", "PREFIRO RESPOSTAS LONGAS."),
+        ("Prefiro respostas longas.", "  Prefiro respostas longas.  "),
+        ("Prefiro respostas longas.", "Prefiro  respostas longas."),
+        ("Prefiro café.", "Prefiro cafe\u0301."),
+        ("Prefiro respostas longas.", "Prefiro respostas longas"),
+    ],
+)
+def test_service_uses_textual_equivalence_only_for_duplicate_comparison(
+    original: str,
+    duplicate: str,
+) -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+
+    created = service.add(original)
+    result = service.add(duplicate)
+
+    assert created.memory is not None
+    assert result.status is AddMemoryStatus.DUPLICATE
+    assert [memory.content for memory in repository.memories] == [original]
+
+
+def test_service_allows_genuinely_different_memories() -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+    first = service.add("Prefiro respostas longas.")
+    service = MemoryService(
+        repository,
+        id_factory=lambda: "87654321-4321-8765-4321-876543218765",
+    )
+
+    second = service.add("Prefiro respostas diretas.")
+
+    assert first.status is AddMemoryStatus.ADDED
+    assert second.status is AddMemoryStatus.ADDED
+    assert [memory.content for memory in repository.memories] == [
+        "Prefiro respostas longas.",
+        "Prefiro respostas diretas.",
+    ]
+
+
 def test_service_owns_editing_and_preserves_identity() -> None:
     repository = InMemoryRepository()
     service = create_service(repository)
@@ -118,6 +163,27 @@ def test_service_rejects_invalid_duplicate_and_unchanged_edits() -> None:
     assert service.edit("Python", "Dart") is EditMemoryStatus.DUPLICATE
     assert service.edit("Python", "Python") is EditMemoryStatus.UNCHANGED
     assert repository.memories == [python, dart]
+
+
+def test_edit_uses_duplicate_key_but_allows_formatting_the_same_memory() -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+    python = service.add("Python.").memory
+    assert python is not None
+    service = MemoryService(
+        repository,
+        id_factory=lambda: "87654321-4321-8765-4321-876543218765",
+        clock=lambda: datetime(2026, 7, 13, tzinfo=UTC),
+    )
+    dart = service.add("Dart.").memory
+    assert dart is not None
+
+    duplicate_status = service.edit("Python.", "dart")
+    formatting_status = service.edit("Python.", "python")
+
+    assert duplicate_status is EditMemoryStatus.DUPLICATE
+    assert formatting_status is EditMemoryStatus.EDITED
+    assert [memory.content for memory in repository.memories] == ["python", "Dart."]
 
 
 def test_service_preserves_memory_position_when_editing() -> None:
@@ -225,6 +291,27 @@ def test_edit_by_id_rejects_duplicate_content_without_persisting() -> None:
 
     assert status is EditMemoryStatus.DUPLICATE
     assert repository.memories == [original, duplicate]
+
+
+def test_edit_by_id_uses_duplicate_key_but_excludes_the_target_memory() -> None:
+    repository = InMemoryRepository()
+    service = create_service(repository)
+    original = service.add("Python.").memory
+    assert original is not None
+    service = MemoryService(
+        repository,
+        id_factory=lambda: "87654321-4321-8765-4321-876543218765",
+        clock=lambda: datetime(2026, 7, 13, tzinfo=UTC),
+    )
+    duplicate = service.add("Dart.").memory
+    assert duplicate is not None
+
+    duplicate_status = service.edit_by_id(original.id, original.content, "DART")
+    formatting_status = service.edit_by_id(original.id, original.content, "python")
+
+    assert duplicate_status is EditMemoryStatus.DUPLICATE
+    assert formatting_status is EditMemoryStatus.EDITED
+    assert [memory.content for memory in repository.memories] == ["python", "Dart."]
 
 
 def test_delete_by_id_removes_only_matching_memory() -> None:

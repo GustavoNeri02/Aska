@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -68,6 +69,30 @@ def test_conversation_can_store_and_report_search_no_results(tmp_path: Path) -> 
 
     assert "Memória registrada localmente." in output
     assert "Nenhuma memória encontrada para o termo." in output
+
+
+def test_literal_remember_rejects_punctuation_duplicate_across_runs(tmp_path: Path) -> None:
+    path = tmp_path / "memories.json"
+    first_output: list[str] = []
+    second_output: list[str] = []
+
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["lembrar: Prefiro respostas longas.", "sair"]),
+        output_writer=first_output.append,
+        memory_service=create_memory_service(path),
+    )
+    run_conversation_loop(
+        FakeProvider(),
+        input_reader=create_input_reader(["lembrar: Prefiro respostas longas", "sair"]),
+        output_writer=second_output.append,
+        memory_service=create_memory_service(path),
+    )
+
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    assert "Memória registrada localmente." in first_output
+    assert "Já existe uma memória com esse conteúdo." in second_output
+    assert [item["content"] for item in persisted] == ["Prefiro respostas longas."]
 
 
 def test_conversation_can_remove_memories_and_list_current_state(tmp_path: Path) -> None:
