@@ -2,7 +2,7 @@
 
 ## Estado atual
 
-**Fase atual:** nenhuma fase está em andamento. Persistent Memory foi concluída, e Tools and capabilities permanece `planned` até a definição de seu primeiro incremento.
+**Fase atual:** Tools and capabilities está `in_progress` com o primeiro incremento vertical de leitura textual confinada ao workspace.
 
 **Última Sprint concluída:** Sprint 1 — primeiro CLI do Aska
 
@@ -31,6 +31,7 @@
 - Mudanças naturais do nome de Gustavo usam padrões determinísticos ou interpretação limitada por modelo para gerar uma proposta; confirmação e edição por ID e snapshot permanecem locais.
 - Pedidos naturais explícitos de memorização usam padrões determinísticos ou interpretação limitada por modelo para gerar uma proposta; somente a confirmação local aciona `MemoryService.add()`.
 - Pedidos naturais explícitos de exclusão selecionam candidatas localmente e somente a confirmação aciona exclusão por ID e snapshot.
+- Pedidos naturais explícitos de leitura de arquivo passam por gate e interpretação estruturada; caminho, permissão e leitura são validados localmente antes de o conteúdo entrar como contexto temporário.
 
 ### Comportamento atual
 
@@ -39,6 +40,11 @@
 - Persistent Memory está `implemented` com persistência JSON estruturada, identidade e metadados mínimos, registro explícito por `lembrar:`, remoção explícita por `esquecer:`, edição explícita por `editar memória:`, pesquisa textual por `buscar memória:` e listagem por `memórias`.
 - O fluxo natural está implementado para alteração do nome e criação, edição ou exclusão explícita de uma memória. Padrões exatos evitam chamadas ao modelo quando disponíveis e gates separados limitam a interpretação de paráfrases; o modelo apenas propõe, enquanto seleção, confirmação e persistência permanecem locais. Captura automática e pedidos genéricos mais amplos continuam `planned`.
 - O comportamento atual do CLI não depende mais da resposta placeholder da Sprint 1.
+- A primeira capability lê um único arquivo UTF-8 de até 64 KiB dentro do workspace configurado por `ASKA_WORKSPACE`; o conteúdo não entra no histórico e é tratado como dado não confiável.
+
+### Incremento atual da Fase 4
+
+O primeiro incremento de Tools and capabilities está `implemented`: um pedido natural pode propor a leitura de um único arquivo textual, mas o modelo produz somente uma intenção com caminho. `TextFileReader` aplica confinamento local ao workspace, inclusive após resolução de symlinks, e `NaturalFileReadHandler` fornece o conteúdo somente à resposta atual. Não há tool calling, execução arbitrária, escrita, listagem de diretórios, leitura binária, múltiplos arquivos ou registry genérico de capabilities.
 
 ### Escopo concluído da Fase 3
 
@@ -62,7 +68,7 @@ Persistent Memory usa objetos com `id`, `content`, `source`, `created_at` e `upd
 | 1 | CLI and local conversation | CLI e primeira conversa com modelo local substituível | `implemented` |
 | 2 | Session context | Histórico e contexto útil na sessão | `implemented` |
 | 3 | Persistent memory | Memória local transparente e consultável | `implemented` |
-| 4 | Tools and capabilities | Registro seguro e primeira capability | `planned` |
+| 4 | Tools and capabilities | Registro seguro e primeira capability | `in_progress` |
 | 5 | Knowledge and retrieval | Indexação de documentos, código e informações | `planned` |
 | 6 | Desktop interaction | Recursos do computador com permissões e auditoria | `planned` |
 | 7 | Vision | Captura e interpretação de tela e imagens | `planned` |

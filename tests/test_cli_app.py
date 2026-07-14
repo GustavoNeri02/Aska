@@ -1,9 +1,11 @@
 from io import StringIO
+from pathlib import Path
 
 import pytest
 
 from apps.cli.app import build_banner, main
 from apps.cli.loading import run_with_loading
+from capabilities.filesystem import TextFileReader
 from packages.conversation import ModelProviderError
 
 
@@ -80,3 +82,30 @@ def test_main_reports_ollama_warm_up_error_and_does_not_start_conversation(
 
     assert "Aska > Modelo indisponível" in capsys.readouterr().out
     assert conversation_started is False
+
+
+def test_main_configures_file_reader_with_allowed_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "README.md").write_text("contexto", encoding="utf-8")
+    configured: dict[str, object] = {}
+
+    def capture_configuration(*args: object, **kwargs: object) -> None:
+        del args
+        configured.update(kwargs)
+
+    monkeypatch.setenv("ASKA_WORKSPACE", str(workspace))
+    monkeypatch.setattr("apps.cli.app.OllamaProvider.warm_up", lambda self: None)
+    monkeypatch.setattr("apps.cli.app.run_with_loading", lambda action, message: action())
+    monkeypatch.setattr("apps.cli.app.run_conversation_loop", capture_configuration)
+    monkeypatch.setattr("apps.cli.app.OllamaProvider.unload", lambda self: None)
+
+    main()
+
+    file_reader = configured["file_reader"]
+    assert isinstance(file_reader, TextFileReader)
+    assert file_reader.read("README.md").content == "contexto"
+    assert configured["file_intent_interpreter"] is not None

@@ -64,6 +64,12 @@ Pedidos explícitos de exclusão usam padrões determinísticos ou um gate local
 
 Pedidos explícitos de alteração de uma memória ou informação passam por gate próprio e podem produzir `EditMemoryIntent` com query e novo conteúdo por JSON estrito. A precedência permanece nome, exclusão, edição genérica e inclusão. O modelo apenas interpreta a mensagem original e não recebe IDs ou memórias. `NaturalMemoryHandler` seleciona localmente uma única candidata por igualdade antes da pesquisa parcial, reutiliza `PendingMemoryEdit` e somente após confirmação chama `MemoryService.edit_by_id()`, preservando ID, snapshot, conflito, duplicidade e datas do domínio. Captura automática e frameworks genéricos de ações continuam `planned`.
 
+### Leitura textual confinada ao workspace — `implemented`
+
+A primeira capability permite ler um único arquivo textual UTF-8 de até 64 KiB dentro de um workspace explicitamente configurado no composition root por `ASKA_WORKSPACE`, usando o diretório atual como padrão. Um gate local evita interpretação adicional em mensagens comuns; quando acionado, `ModelFileIntentInterpreter` aceita somente JSON estrito com uma ação `read_text_file` e um caminho. O modelo não recebe conteúdo prévio, não acessa o filesystem e não concede permissões.
+
+`TextFileReader`, em `capabilities/filesystem`, resolve o caminho localmente e rejeita caminhos absolutos, travessia, symlinks que escapem do workspace, diretórios, arquivos ausentes, vazios, binários, não UTF-8 ou acima do limite. `NaturalFileReadHandler` coordena esse fluxo específico no CLI e entrega o resultado a `ConversationService` como contexto temporário marcado como dado não confiável; o conteúdo não entra no histórico. Não foi criado registry, planner, tool calling ou abstração genérica de capabilities.
+
 ## Decisões substituídas, rejeitadas ou adiadas
 
 - Automação como núcleo — `superseded` por conversa e IA pessoal como núcleo.
@@ -83,7 +89,6 @@ Pedidos explícitos de alteração de uma memória ou informação passam por ga
 
 - Critérios concretos para migrar a persistência de memória de JSON para SQLite.
 - Formato do manifesto de capabilities.
-- Primeira capability concreta, provavelmente filesystem.
 - Tecnologia da interface desktop futura.
 - Estratégia futura de voz, visão e avatar.
 

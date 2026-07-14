@@ -4,7 +4,7 @@ Aska é uma IA pessoal local, conversacional e progressivamente multimodal. O pr
 
 ## Estado atual
 
-O CLI conversa com o modelo local por meio do Ollama, mantém o histórico da sessão e oferece memória persistente explícita em JSON com listagem, busca, criação, edição e exclusão. Persistent Memory está `implemented`; capabilities de ferramentas e automação continuam `planned` e ainda não possuem fase em andamento.
+O CLI conversa com o modelo local por meio do Ollama, mantém o histórico da sessão, oferece memória persistente explícita em JSON e pode ler com segurança um arquivo textual dentro do workspace para usá-lo como contexto temporário. Persistent Memory está `implemented`; Tools and capabilities está `in_progress` somente com esse primeiro incremento de leitura.
 
 Veja o [estado detalhado e roadmap](docs/project/roadmap.md).
 
@@ -30,6 +30,12 @@ $env:ASKA_MODEL = "gemma3:12b"
 ```
 
 O endereço do Ollama também pode ser alterado com `ASKA_OLLAMA_URL`.
+
+O workspace permitido para leitura de arquivos usa o diretório atual por padrão e pode ser configurado explicitamente:
+
+```powershell
+$env:ASKA_WORKSPACE = "D:\Projetos\Aska"
+```
 
 ## Executar
 

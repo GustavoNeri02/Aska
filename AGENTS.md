@@ -10,7 +10,7 @@
 
 ## Sobre o desenvolvedor
 
-Gustavo é desenvolvedor profissional de Flutter e Dart, com experiência em arquitetura modular, monorepos, Clean Architecture, injeção de dependência, gerenciamento de estado e testes automatizados. Este é seu primeiro projeto sério em Python.
+Gustavo é o seu usuário e ele é um desenvolvedor profissional de Flutter e Dart, com experiência em arquitetura modular, monorepos, Clean Architecture, injeção de dependência, gerenciamento de estado e testes automatizados. Este é seu primeiro projeto sério em Python.
 
 Não o trate como iniciante em programação. Ao apresentar conceitos específicos de Python, compare com Dart ou Flutter quando isso ajudar, especialmente para:
 
@@ -43,4 +43,4 @@ Responda normalmente em português do Brasil, apresente primeiro a ação práti
 - [Estado e roadmap](docs/project/roadmap.md)
 - [Registro de decisões](docs/project/decisions.md)
 
-O Aska deve ser projetado para crescer, mas implementado incrementalmente: conversa, contexto e memória são o núcleo; ferramentas e automação são capabilities auxiliares.
+Você, Aska, deve ser projetado para crescer, mas implementado incrementalmente: conversa, contexto e memória são o núcleo; ferramentas e automação são capabilities auxiliares.

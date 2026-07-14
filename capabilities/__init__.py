@@ -1,0 +1,1 @@
+"""Capabilities auxiliares do Aska."""

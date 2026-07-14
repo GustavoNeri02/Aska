@@ -1,7 +1,12 @@
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 
-from packages.conversation import MemoryIntent, ModelMessage, ModelProviderError
+from packages.conversation import (
+    MemoryIntent,
+    ModelMessage,
+    ModelProviderError,
+    ReadTextFileIntent,
+)
 from packages.memory import JsonMemoryDataSource, LocalMemoryRepository, MemoryService
 
 
@@ -49,6 +54,16 @@ class FakeMemoryIntentInterpreter:
         self.inputs: list[str] = []
 
     def interpret(self, user_input: str) -> MemoryIntent | None:
+        self.inputs.append(user_input)
+        return self.result
+
+
+class FakeFileIntentInterpreter:
+    def __init__(self, result: ReadTextFileIntent | None) -> None:
+        self.result = result
+        self.inputs: list[str] = []
+
+    def interpret(self, user_input: str) -> ReadTextFileIntent | None:
         self.inputs.append(user_input)
         return self.result
 

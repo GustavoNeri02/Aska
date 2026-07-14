@@ -1,17 +1,22 @@
 import os
 from collections.abc import Callable
 from contextlib import suppress
+from pathlib import Path
 
 from apps.cli.command_parser import parse_input
 from apps.cli.commands import ChatMessage, ExitCommand, InvalidCommand, MemoryCommand
 from apps.cli.handlers import (
+    NaturalFileReadHandler,
     NaturalMemoryHandler,
     handle_memory_command,
 )
 from apps.cli.loading import run_with_loading
+from capabilities.filesystem import TextFileReader
 from packages.conversation import (
     ConversationService,
+    FileIntentInterpreter,
     MemoryIntentInterpreter,
+    ModelFileIntentInterpreter,
     ModelMemoryIntentInterpreter,
     ModelProvider,
     ModelProviderError,
@@ -38,6 +43,8 @@ def run_conversation_loop(
     model_provider: ModelProvider,
     memory_service: MemoryService,
     memory_intent_interpreter: MemoryIntentInterpreter | None = None,
+    file_reader: TextFileReader | None = None,
+    file_intent_interpreter: FileIntentInterpreter | None = None,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
 ) -> None:
@@ -52,6 +59,16 @@ def run_conversation_loop(
         memory_service,
         memory_intent_interpreter,
         output_writer,
+    )
+    natural_file_handler = (
+        NaturalFileReadHandler(
+            file_reader,
+            file_intent_interpreter,
+            conversation_service,
+            output_writer,
+        )
+        if file_reader is not None and file_intent_interpreter is not None
+        else None
     )
 
     while True:
@@ -79,6 +96,10 @@ def run_conversation_loop(
             elif isinstance(parsed_input, ChatMessage):
                 if natural_memory_handler.handle(parsed_input.content):
                     continue
+                if natural_file_handler is not None and natural_file_handler.handle(
+                    parsed_input.content
+                ):
+                    continue
                 response = conversation_service.send(parsed_input.content)
                 output_writer(f"Aska > {response}")
         except MemoryRepositoryError as error:
@@ -97,6 +118,9 @@ def main() -> None:
     memory_repository = LocalMemoryRepository(memory_data_source)
     memory_service = MemoryService(memory_repository)
     memory_intent_interpreter = ModelMemoryIntentInterpreter(model_provider)
+    workspace_root = Path(os.getenv("ASKA_WORKSPACE", str(Path.cwd())))
+    file_reader = TextFileReader(workspace_root)
+    file_intent_interpreter = ModelFileIntentInterpreter(model_provider)
 
     try:
         try:
@@ -108,6 +132,8 @@ def main() -> None:
             model_provider,
             memory_service=memory_service,
             memory_intent_interpreter=memory_intent_interpreter,
+            file_reader=file_reader,
+            file_intent_interpreter=file_intent_interpreter,
         )
     finally:
         with suppress(ModelProviderError):

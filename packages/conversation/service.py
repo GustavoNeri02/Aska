@@ -1,7 +1,7 @@
 from typing import Protocol
 
 from packages.conversation.context import ContextBuilder
-from packages.conversation.model import ConversationTurn
+from packages.conversation.model import ConversationTurn, TemporaryContext
 from packages.conversation.provider import ModelProvider
 from packages.memory import Memory
 
@@ -26,11 +26,16 @@ class ConversationService:
     def history(self) -> list[ConversationTurn]:
         return list(self._history)
 
-    def send(self, user_message: str) -> str:
+    def send(
+        self,
+        user_message: str,
+        temporary_context: TemporaryContext | None = None,
+    ) -> str:
         messages = self._context_builder.build(
             history=self._history,
             user_message=user_message,
             memories=self._memory_reader.list(),
+            temporary_context=temporary_context,
         )
         response = self._model_provider.generate(messages)
         self._history.append(ConversationTurn(user_message, response))

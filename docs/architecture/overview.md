@@ -48,6 +48,8 @@ Os pedidos naturais de memória implementados neste estágio são a mudança do 
 
 No CLI, `commands.py` define as intenções tipadas, `command_parser.py` converte texto nesses comandos e `handlers/memory.py` traduz comandos literais de memória em chamadas ao `MemoryService` e mensagens de saída. `NaturalMemoryHandler`, em `handlers/natural_memory.py`, mantém somente durante a sessão a proposta pendente e coordena detecção, interpretação, seleção, confirmação e apresentação dos fluxos naturais existentes. `app.py` mantém o loop, o despacho de alto nível e o composition root; o handler é uma coordenação específica do CLI, não um framework genérico de ações.
 
+A primeira capability implementada é a leitura de um único arquivo textual. Um gate local limita quando `ModelFileIntentInterpreter` pode classificar o pedido e extrair um caminho por JSON estrito; o modelo não lê o arquivo nem decide permissões. `NaturalFileReadHandler` entrega o caminho ao `TextFileReader`, que aceita somente caminhos relativos resolvidos dentro do workspace configurado, rejeita escapes por `..` ou symlink, diretórios, conteúdo não UTF-8, arquivos vazios e arquivos acima de 64 KiB. O conteúdo validado entra apenas como contexto temporário da solicitação atual, marcado como dado não confiável, e não é copiado para o histórico da conversa.
+
 O contrato `ModelProvider` pertence a `packages/conversation`, que é seu consumidor, e expõe somente `generate()` sobre uma sequência provider-agnostic de `ModelMessage`. A identidade do Aska compõe a primeira mensagem `system`; entradas e respostas preservam os papéis `user` e `assistant`. O pacote `packages/inference` contém o primeiro adaptador, que converte essas mensagens para a API HTTP do Ollama sem definir identidade ou contexto. `warm_up()` e `unload()` são comportamentos específicos de `OllamaProvider` e são coordenados pelo composition root do CLI; não fazem parte de um lifecycle abstrato de providers. Um contrato de lifecycle só deve ser introduzido quando mais providers apresentarem uma necessidade comum concreta. llama.cpp, LM Studio e vLLM continuam alternativas futuras. Gemini, ChatGPT e outras IAs externas podem ajudar no desenvolvimento, mas não são dependências de runtime.
 
 ## Monorepo
@@ -80,12 +82,13 @@ Cada package expõe sua API pública por `__init__.py`, de forma semelhante a um
 
 ## Capabilities
 
-Capabilities futuras incluem filesystem, terminal, código, Flutter, browser/web, desktop, visão, voz, Git/GitHub e organização pessoal. Cada uma deve ter contratos, configuração, permissões e testes próprios apenas quando a complexidade justificar.
+A leitura textual confinada ao workspace é a primeira capability implementada. Escrita, listagem de diretórios e outras operações de filesystem, além de terminal, código, Flutter, browser/web, desktop, visão, voz, Git/GitHub e organização pessoal, continuam `planned`. Cada operação adicional deve ter contratos, configuração, permissões e testes próprios apenas quando uma necessidade concreta justificar.
 
 ## Segurança
 
 - Negar ou pedir confirmação quando o risco for significativo.
 - Aplicar menor privilégio e restringir diretórios e comandos.
+- Resolver e validar caminhos localmente contra o workspace permitido antes de acessar o filesystem.
 - Separar sugerir, planejar e executar.
 - Registrar ações relevantes para auditoria.
 - Confirmar ações sensíveis e nunca executar ações destrutivas silenciosamente.

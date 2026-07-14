@@ -1,6 +1,17 @@
 from packages.conversation.context import ContextBuilder
 from packages.conversation.identity import ASKA_IDENTITY
-from packages.conversation.model import ConversationTurn, ModelMessage, ModelRole
+from packages.conversation.model import (
+    ConversationTurn,
+    ModelMessage,
+    ModelRole,
+    TemporaryContext,
+)
+from packages.conversation.natural_file import (
+    FileIntentInterpreter,
+    ModelFileIntentInterpreter,
+    ReadTextFileIntent,
+    should_interpret_file_read,
+)
 from packages.conversation.natural_memory import (
     AddMemoryIntent,
     DeleteMemoryIntent,
@@ -34,6 +45,7 @@ __all__ = [
     "ContextBuilder",
     "ConversationService",
     "ConversationTurn",
+    "FileIntentInterpreter",
     "ModelProvider",
     "ModelProviderError",
     "ModelMessage",
@@ -41,10 +53,13 @@ __all__ = [
     "MemoryIntent",
     "MemoryIntentInterpreter",
     "ModelMemoryIntentInterpreter",
+    "ModelFileIntentInterpreter",
     "NameUpdateIntent",
     "PendingMemoryAdd",
     "PendingMemoryDelete",
     "PendingMemoryEdit",
+    "ReadTextFileIntent",
+    "TemporaryContext",
     "canonical_name_memory",
     "detect_memory_add",
     "detect_memory_delete",
@@ -55,4 +70,5 @@ __all__ = [
     "should_interpret_memory_edit",
     "should_interpret_name_change",
     "should_interpret_memory_intent",
+    "should_interpret_file_read",
 ]
