@@ -317,6 +317,24 @@ def test_model_interpreter_returns_typed_memory_edit() -> None:
     assert result == EditMemoryIntent("trabalho com Flutter", "Eu trabalho com Python.")
 
 
+def test_model_interpreter_instruction_classifies_preference_change_as_edit() -> None:
+    provider = StaticProvider('{"action":"none"}')
+    interpreter = ModelMemoryIntentInterpreter(provider)
+
+    interpreter.interpret("Troque minha preferência por respostas longas para respostas diretas.")
+
+    instruction = provider.requests[0][0].content
+    assert "mudança explícita de preferência" in instruction
+    assert (
+        "Entrada: Troque minha preferência por respostas longas para respostas diretas."
+        in instruction
+    )
+    assert (
+        'Saída: {"action":"edit_memory","query":"respostas longas",'
+        '"new_content":"Prefiro respostas diretas."}' in instruction
+    )
+
+
 @pytest.mark.parametrize(
     "response",
     [

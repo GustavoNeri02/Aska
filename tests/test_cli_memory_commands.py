@@ -1427,6 +1427,9 @@ def test_generic_memory_edit_exact_match_precedes_partial_matches(tmp_path: Path
     interpreter = FakeMemoryIntentInterpreter(EditMemoryIntent("Flutter", "Python"))
     store = create_temp_memory_service(tmp_path)
     exact = store.add("Flutter").memory
+    partial = store.add("Eu trabalho com Flutter.").memory
+    assert exact is not None
+    assert partial is not None
 
     run_conversation_loop(
         FakeProvider(),
@@ -1437,8 +1440,7 @@ def test_generic_memory_edit_exact_match_precedes_partial_matches(tmp_path: Path
     )
 
     assert "Conteúdo atual: Flutter" in output
-    assert [memory.content for memory in store.list()] == ["Python", "Eu trabalho com Flutter."]
-    assert exact is not None
+    assert [memory.content for memory in store.list()] == ["Python", partial.content]
 
 
 def test_generic_memory_edit_uses_partial_search_for_single_candidate(tmp_path: Path) -> None:

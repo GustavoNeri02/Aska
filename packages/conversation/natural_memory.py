@@ -64,20 +64,49 @@ _MEMORY_EDIT_GATE_TERMS = (
         re.IGNORECASE,
     ),
 )
-_INTERPRETER_INSTRUCTION = """Classifique somente se a mensagem pede explicitamente para:
-- alterar o nome de Gustavo; ou
-- guardar uma única informação como memória; ou
-- excluir uma memória descrita pelo usuário; ou
-- editar uma memória descrita pelo usuário.
-Responda com exatamente um objeto JSON, sem Markdown ou texto adicional.
-Formatos permitidos:
-{"action":"update_name","new_name":"Novo Nome"}
-{"action":"add_memory","content":"Informação a guardar."}
-{"action":"delete_memory","query":"Informação a localizar."}
-{"action":"edit_memory","query":"Informação atual.","new_content":"Nova informação."}
-{"action":"none"}
-Preserve o significado e negações da informação original.
-Não execute ações, não informe sucesso e não invente informações."""
+_INTERPRETER_INSTRUCTION = "\n".join(
+    (
+        "Apenas classifique a mensagem. Não responda ao pedido.",
+        "Classifique somente se a mensagem pede explicitamente para:",
+        "- alterar o nome de Gustavo; ou",
+        "- guardar uma única informação como memória; ou",
+        "- excluir uma memória descrita pelo usuário; ou",
+        "- editar uma memória descrita pelo usuário, incluindo uma preferência conhecida.",
+        "Responda com exatamente um objeto JSON, sem Markdown ou texto adicional.",
+        "Formatos permitidos:",
+        '{"action":"update_name","new_name":"Novo Nome"}',
+        '{"action":"add_memory","content":"Informação a guardar."}',
+        '{"action":"delete_memory","query":"Informação a localizar."}',
+        ('{"action":"edit_memory","query":"Informação atual.","new_content":"Nova informação."}'),
+        '{"action":"none"}',
+        "Regras para edit_memory:",
+        (
+            "- Uma mudança explícita de preferência anteriormente conhecida é edit_memory, "
+            'mesmo sem a palavra "memória".'
+        ),
+        "- query deve reutilizar palavras distintivas do conteúdo antigo, sem paráfrase excessiva.",
+        "- new_content deve ser uma memória completa e independente.",
+        "- Preserve negações e o significado informado.",
+        (
+            "Se não houver uma ação explícita de memória ou mudança de preferência conhecida, "
+            'retorne {"action":"none"}.'
+        ),
+        "Exemplos:",
+        "Entrada: Troque minha preferência por respostas longas para respostas diretas.",
+        (
+            'Saída: {"action":"edit_memory","query":"respostas longas",'
+            '"new_content":"Prefiro respostas diretas."}'
+        ),
+        "Entrada: Atualize a memória sobre Flutter: agora eu trabalho com Python.",
+        (
+            'Saída: {"action":"edit_memory","query":"Flutter",'
+            '"new_content":"Eu trabalho com Python."}'
+        ),
+        "Entrada: Atualize meu aplicativo.",
+        'Saída: {"action":"none"}',
+        "Não execute ações, não informe sucesso e não invente informações.",
+    )
+)
 
 
 @dataclass(frozen=True, slots=True)
