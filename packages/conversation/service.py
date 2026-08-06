@@ -86,12 +86,14 @@ class ConversationService:
 
     def present_event(
         self,
-        original_user_message: str,
+        user_message: str,
         event: ConversationEvent,
+        original_request: str | None = None,
     ) -> str:
+        event_request = original_request or user_message
         messages = self._context_builder.build(
             history=self._history,
-            user_message=event.to_context_message(original_user_message),
+            user_message=event.to_context_message(event_request),
             memories=self._memory_reader.list(),
             additional_system_instruction=CONVERSATION_EVENT_RESPONSE_INSTRUCTION,
         )
@@ -99,21 +101,37 @@ class ConversationService:
         try:
             decision = parse_conversation_decision(response)
         except ConversationDecisionError:
-            natural_response = response.strip()
-            if not natural_response or "\0" in natural_response:
-                raise
+            natural_response = _parse_event_response_with_optional_preamble(response)
         else:
             if not isinstance(decision, ReplyDecision) or decision.offer is not None:
-                raise ConversationDecisionError(
-                    "conversation event response must be a plain reply"
-                )
+                raise ConversationDecisionError("conversation event response must be a plain reply")
             natural_response = decision.content
         self._history.append(
             ConversationTurn(
-                original_user_message.strip(),
+                user_message.strip(),
                 natural_response,
-                event.to_context_message(original_user_message),
+                event.to_context_message(event_request),
             )
         )
         self._pending_offer = None
         return natural_response
+
+
+def _parse_event_response_with_optional_preamble(response: str) -> str:
+    normalized = response.strip()
+    if not normalized or "\0" in normalized:
+        raise ConversationDecisionError("conversation event response must be valid text")
+
+    object_start = normalized.find("{")
+    if object_start < 0:
+        return normalized
+
+    try:
+        decision = parse_conversation_decision(normalized[object_start:])
+    except ConversationDecisionError as error:
+        raise ConversationDecisionError(
+            "conversation event response contains an invalid envelope"
+        ) from error
+    if not isinstance(decision, ReplyDecision) or decision.offer is not None:
+        raise ConversationDecisionError("conversation event response must be a plain reply")
+    return decision.content

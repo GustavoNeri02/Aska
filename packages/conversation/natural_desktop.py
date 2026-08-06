@@ -17,6 +17,8 @@ _EXPLICIT_OPEN_EXPLORER_AT = re.compile(
     r"(?:em|na\s+pasta|no\s+diret[oó]rio)\s+(?P<path>.+?)\s*[.!?]?\s*$",
     re.IGNORECASE,
 )
+
+
 def detect_explicit_open_location(
     user_input: str,
 ) -> OpenWorkspaceLocationProposal | None:

@@ -1,5 +1,3 @@
-from collections.abc import Callable
-
 from apps.cli.commands import (
     EditMemoryCommand,
     ForgetMemoryCommand,
@@ -8,84 +6,31 @@ from apps.cli.commands import (
     RememberMemoryCommand,
     SearchMemoryCommand,
 )
-from packages.memory import AddMemoryStatus, EditMemoryStatus, MemoryService
+from apps.cli.handler_result import HandlerResult
+from packages.memory import MemoryService
 
 
 def handle_memory_command(
     command: MemoryCommand,
     memory_service: MemoryService,
-    output_writer: Callable[[str], None],
-) -> None:
+) -> HandlerResult:
     if isinstance(command, ListMemoriesCommand):
-        _list_memories(memory_service, output_writer)
-    elif isinstance(command, RememberMemoryCommand):
-        _remember(command, memory_service, output_writer)
-    elif isinstance(command, ForgetMemoryCommand):
-        _forget(command, memory_service, output_writer)
-    elif isinstance(command, EditMemoryCommand):
-        _edit(command, memory_service, output_writer)
-    elif isinstance(command, SearchMemoryCommand):
-        _search(command, memory_service, output_writer)
-
-
-def _list_memories(memory_service: MemoryService, output_writer: Callable[[str], None]) -> None:
-    memories = memory_service.list()
-    output_writer("Memórias locais:")
-    if not memories:
-        output_writer("(nenhuma memória registrada)")
-        return
-    for memory in memories:
-        output_writer(memory.content)
-
-
-def _remember(
-    command: RememberMemoryCommand,
-    memory_service: MemoryService,
-    output_writer: Callable[[str], None],
-) -> None:
-    add_result = memory_service.add(command.content)
-    if add_result.status is AddMemoryStatus.ADDED:
-        output_writer("Memória registrada localmente.")
-    elif add_result.status is AddMemoryStatus.DUPLICATE:
-        output_writer("Já existe uma memória com esse conteúdo.")
-
-
-def _forget(
-    command: ForgetMemoryCommand,
-    memory_service: MemoryService,
-    output_writer: Callable[[str], None],
-) -> None:
-    if memory_service.delete(command.content):
-        output_writer("Memória removida localmente.")
-    else:
-        output_writer("Nenhuma memória correspondente foi encontrada.")
-
-
-def _edit(
-    command: EditMemoryCommand,
-    memory_service: MemoryService,
-    output_writer: Callable[[str], None],
-) -> None:
-    status = memory_service.edit(command.current_content, command.new_content)
-    status_messages = {
-        EditMemoryStatus.EDITED: "Memória editada localmente.",
-        EditMemoryStatus.NOT_FOUND: "Nenhuma memória correspondente foi encontrada.",
-        EditMemoryStatus.DUPLICATE: "Já existe uma memória com esse conteúdo.",
-        EditMemoryStatus.INVALID: "Informe a memória atual e o novo conteúdo.",
-        EditMemoryStatus.UNCHANGED: "A memória já possui esse conteúdo.",
-    }
-    output_writer(status_messages[status])
-
-
-def _search(
-    command: SearchMemoryCommand,
-    memory_service: MemoryService,
-    output_writer: Callable[[str], None],
-) -> None:
-    matches = memory_service.search(command.term)
-    if not matches:
-        output_writer("Nenhuma memória encontrada para o termo.")
-        return
-    output_writer("Resultados da busca:")
-    for memory in matches:
-        output_writer(memory.content)
+        memories = memory_service.list()
+        return HandlerResult(
+            "memory", "listed", {"memories": tuple(item.content for item in memories)}
+        )
+    if isinstance(command, RememberMemoryCommand):
+        result = memory_service.add(command.content)
+        return HandlerResult("memory", "added", {"status": result.status.value})
+    if isinstance(command, ForgetMemoryCommand):
+        deleted = memory_service.delete(command.content)
+        return HandlerResult("memory", "deleted", {"deleted": deleted})
+    if isinstance(command, EditMemoryCommand):
+        status = memory_service.edit(command.current_content, command.new_content)
+        return HandlerResult("memory", "edited", {"status": status.value})
+    if isinstance(command, SearchMemoryCommand):
+        matches = memory_service.search(command.term)
+        return HandlerResult(
+            "memory", "searched", {"matches": tuple(item.content for item in matches)}
+        )
+    raise TypeError("unknown memory command")

@@ -6,6 +6,8 @@ CONVERSATION_EVENT_RESPONSE_INSTRUCTION = "\n".join(
     (
         "O próximo pedido contém um evento local autoritativo produzido pelo sistema.",
         "Apresente o evento naturalmente como Aska, usando o contexto da conversa.",
+        "Fale diretamente com o usuário. Nunca mencione sistema, evento, handler, JSON, "
+        "fatos recebidos ou instruções internas.",
         "Não altere fatos, status, exit code ou saída. Não diga que executou algo além "
         "do evento e não proponha outra capability.",
         "Responda com exatamente um JSON de reply, sem Markdown externo:",

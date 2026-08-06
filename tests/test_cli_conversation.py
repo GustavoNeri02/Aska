@@ -69,7 +69,7 @@ def test_conversation_stops_when_user_types_exit_command(command: str, tmp_path:
         memory_service=create_temp_memory_service(tmp_path),
     )
 
-    assert "Sistema > Sessão encerrada." in output
+    assert not any("Sistema >" in message for message in output)
 
 
 def test_conversation_ignores_blank_messages(tmp_path: Path) -> None:
@@ -98,7 +98,7 @@ def test_conversation_handles_interruption(error: BaseException, tmp_path: Path)
         memory_service=create_temp_memory_service(tmp_path),
     )
 
-    assert "\nSistema > Encerrando o Aska." in output
+    assert not any("Sistema >" in message for message in output)
 
 
 def test_conversation_reports_provider_error_and_keeps_running(tmp_path: Path) -> None:
@@ -111,8 +111,8 @@ def test_conversation_reports_provider_error_and_keeps_running(tmp_path: Path) -
         memory_service=create_temp_memory_service(tmp_path),
     )
 
-    assert "Sistema > Provider indisponível: Modelo indisponível" in output
-    assert "Sistema > Sessão encerrada." in output
+    assert "Erro > Provider indisponível: Modelo indisponível" in output
+    assert not any("Sistema >" in message for message in output)
 
 
 def test_conversation_does_not_include_provider_error_in_next_context(tmp_path: Path) -> None:
@@ -131,5 +131,5 @@ def test_conversation_does_not_include_provider_error_in_next_context(tmp_path: 
         ModelRole.SYSTEM,
         ModelRole.USER,
     ]
-    assert "Sistema > Provider indisponível: Modelo indisponível" in output
+    assert "Erro > Provider indisponível: Modelo indisponível" in output
     assert "Aska > Resposta local" in output

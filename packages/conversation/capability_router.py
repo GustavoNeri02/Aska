@@ -3,15 +3,12 @@ from dataclasses import dataclass
 
 CONVERSATION_DECISION_INSTRUCTION = "\n".join(
     (
-        "Para este turno, responda com exatamente um objeto JSON, sem Markdown ou "
-        "texto adicional.",
+        "Para este turno, responda com exatamente um objeto JSON, sem Markdown ou texto adicional.",
         "Escolha entre responder normalmente e propor uma capability do catálogo fechado.",
         "Formatos permitidos:",
         '{"type":"reply","content":"sua resposta ao usuário"}',
-        '{"type":"reply","content":"sua resposta","offer":'
-        '{"action":"run_project_tests"}}',
-        '{"type":"capability_proposal","action":"open_workspace_location",'
-        '"path":"docs"}',
+        '{"type":"reply","content":"sua resposta","offer":{"action":"run_project_tests"}}',
+        '{"type":"capability_proposal","action":"open_workspace_location","path":"docs"}',
         '{"type":"capability_proposal","action":"run_project_tests"}',
         "Capability disponível:",
         "- open_workspace_location: abre uma pasta relativa do workspace no Explorador "
@@ -104,9 +101,7 @@ def parse_conversation_decision(response: str) -> ConversationDecision:
         if content is None or offer is None:
             raise ConversationDecisionError("reply offer must be valid")
         return ReplyDecision(content, offer)
-    if set(data) == {"type", "action", "path"} and data.get(
-        "type"
-    ) == "capability_proposal":
+    if set(data) == {"type", "action", "path"} and data.get("type") == "capability_proposal":
         if data.get("action") != "open_workspace_location":
             raise ConversationDecisionError("unknown capability action")
         path = _validated_path(data.get("path"))

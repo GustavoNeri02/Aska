@@ -36,9 +36,7 @@ class FailingRunner:
 
 def test_project_tests_use_fixed_operation_and_workspace(tmp_path: Path) -> None:
     runner = RecordingRunner(ProjectTestProcessResult(0, "2 passed", ""))
-    capability = RunProjectTestsCapability(
-        tmp_path.resolve(), runner, timeout_seconds=30
-    )
+    capability = RunProjectTestsCapability(tmp_path.resolve(), runner, timeout_seconds=30)
     target = capability.prepare()
 
     result = capability.run(target)
@@ -87,10 +85,7 @@ def test_timeout_and_start_failure_are_distinct(tmp_path: Path) -> None:
     )
 
     assert timed_out.run(timed_out.prepare()).status is RunProjectTestsStatus.TIMED_OUT
-    assert (
-        start_failed.run(start_failed.prepare()).status
-        is RunProjectTestsStatus.START_FAILED
-    )
+    assert start_failed.run(start_failed.prepare()).status is RunProjectTestsStatus.START_FAILED
 
 
 def test_process_output_is_bounded(tmp_path: Path) -> None:

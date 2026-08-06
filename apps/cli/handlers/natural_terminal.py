@@ -1,17 +1,17 @@
-from collections.abc import Callable
 from dataclasses import dataclass
 
-from apps.cli.confirmation import ConfirmationDecision, parse_confirmation
+from apps.cli.confirmation import (
+    ConfirmationDecision,
+    ConfirmationInterpreter,
+    parse_confirmation,
+)
+from apps.cli.handler_result import HandlerResult
 from capabilities.terminal import (
     ProjectTestTarget,
     RunProjectTestsCapability,
     RunProjectTestsResult,
 )
-from packages.conversation import (
-    ConversationEvent,
-    ConversationService,
-    RunProjectTestsProposal,
-)
+from packages.conversation import RunProjectTestsProposal
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,97 +24,76 @@ class NaturalProjectTestsHandler:
     def __init__(
         self,
         capability: RunProjectTestsCapability,
-        conversation_service: ConversationService,
-        output_writer: Callable[[str], None],
+        confirmation_interpreter: ConfirmationInterpreter | None = None,
     ) -> None:
         self._capability = capability
-        self._conversation_service = conversation_service
-        self._output_writer = output_writer
+        self._confirmation_interpreter = confirmation_interpreter
         self._pending: _PendingProjectTests | None = None
 
-    def handle(self, user_input: str) -> bool:
+    def handle(self, user_input: str) -> HandlerResult | None:
         if self._pending is None:
-            return False
-        decision = parse_confirmation(user_input)
-        if decision is ConfirmationDecision.UNKNOWN:
-            self._output_writer(
-                "Confirmação não reconhecida. Digite 'sim' para confirmar ou 'não' "
-                "para cancelar."
+            return None
+        decision = (
+            self._confirmation_interpreter.interpret(
+                user_input,
+                "executar a suíte inteira de testes do projeto",
             )
-            return True
+            if self._confirmation_interpreter is not None
+            else parse_confirmation(user_input)
+        )
+        if decision is ConfirmationDecision.UNKNOWN:
+            return HandlerResult(
+                "project_tests",
+                "confirmation_unknown",
+                {"pending_action": "run_project_tests"},
+            )
 
         pending = self._pending
         self._pending = None
+        if pending is None:
+            raise RuntimeError("confirmed project test proposal has no target")
         if decision is ConfirmationDecision.CANCEL:
-            fact_message = "Estado local da ação: cancelled"
-            self._output_writer(fact_message)
-            response = self._conversation_service.present_event(
-                pending.user_message,
-                ConversationEvent(
-                    domain="project_tests",
-                    kind="cancelled",
-                    facts={},
-                ),
+            return HandlerResult(
+                "project_tests",
+                "cancelled",
+                original_request=pending.user_message,
             )
-            self._output_writer(f"Aska > {response}")
-            return True
 
         result = self._capability.run(pending.target)
-        fact_message = _present_facts(result)
-        self._output_writer(fact_message)
-        response = self._conversation_service.present_event(
-            pending.user_message,
-            ConversationEvent(
-                domain="project_tests",
-                kind="completed",
-                facts=_event_facts(result),
-            ),
+        return HandlerResult(
+            "project_tests",
+            "completed",
+            _event_facts(result),
+            original_request=pending.user_message,
         )
-        self._output_writer(f"Aska > {response}")
-        return True
 
     def handle_proposal(
         self,
         proposal: RunProjectTestsProposal,
         user_message: str,
-    ) -> bool:
+    ) -> HandlerResult:
         del proposal
         try:
             target = self._capability.prepare()
         except OSError:
-            self._output_writer("Não foi possível validar o workspace para os testes.")
-            return True
+            return HandlerResult("project_tests", "workspace_invalid")
         self._pending = _PendingProjectTests(target, user_message)
-        command = " ".join(self._capability.command)
-        self._output_writer(
-            "Proposta de execução:\n"
-            "Operação: testes do projeto\n"
-            f"Comando fixo: {command}\n"
-            f"Diretório: {target.workspace_root}\n"
-            f"Timeout: {self._capability.timeout_seconds:g} segundos\n"
-            "Confirmar execução? Digite 'sim' para confirmar ou 'não' para cancelar."
+        return HandlerResult(
+            "project_tests",
+            "confirmation_required",
+            {
+                "operation": "run_project_tests",
+                "command": tuple(self._capability.command),
+                "directory": str(target.workspace_root),
+                "timeout_seconds": self._capability.timeout_seconds,
+            },
         )
-        return True
 
-    def cancel_pending_for_literal_command(self) -> None:
+    def cancel_pending_for_literal_command(self) -> HandlerResult | None:
         if self._pending is not None:
-            pending = self._pending
             self._pending = None
-            del pending
-            self._output_writer("Estado local da ação: cancelled")
-
-
-def _present_facts(result: RunProjectTestsResult) -> str:
-    sections = ["Resultado local da ação:", f"Status: {result.status.value}"]
-    if result.exit_code is not None:
-        sections.append(f"Exit code: {result.exit_code}")
-    if result.stdout.strip():
-        sections.append(f"stdout:\n{result.stdout.rstrip()}")
-    if result.stderr.strip():
-        sections.append(f"stderr:\n{result.stderr.rstrip()}")
-    if result.output_truncated:
-        sections.append("A saída foi truncada no limite seguro configurado.")
-    return "\n".join(sections)
+            return HandlerResult("project_tests", "cancelled")
+        return None
 
 
 def _event_facts(result: RunProjectTestsResult) -> dict[str, object]:
@@ -131,8 +110,4 @@ def _compact_for_history(message: str, max_chars: int = 4096) -> str:
     if len(message) <= max_chars:
         return message
     side_chars = (max_chars - len("\n... resultado compactado ...\n")) // 2
-    return (
-        f"{message[:side_chars]}\n"
-        "... resultado compactado ...\n"
-        f"{message[-side_chars:]}"
-    )
+    return f"{message[:side_chars]}\n... resultado compactado ...\n{message[-side_chars:]}"
