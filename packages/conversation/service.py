@@ -77,16 +77,18 @@ class ConversationService:
     def decide(self, user_message: str) -> ConversationDecision:
         memories = self._select_memories(user_message)
         decision_instruction = CONVERSATION_DECISION_INSTRUCTION
-        if self._pending_offer is not None:
+        pending_offer = self._pending_offer
+        if pending_offer is not None:
             offer = json.dumps(
-                describe_capability_proposal(self._pending_offer),
+                describe_capability_proposal(pending_offer),
                 ensure_ascii=False,
             )
             decision_instruction = (
                 f"{decision_instruction}\n\n"
                 "Oferta tipada pendente do turno anterior: "
                 f"{offer}. Interprete a nova mensagem em relação a essa oferta; somente "
-                "produza a proposal se o usuário a aceitar ou solicitar."
+                "produza a proposal se o usuário a aceitar ou solicitar. Se recusar, "
+                'responda como {"type":"reply","content":"resposta natural"} sem offer.'
             )
         messages = self._context_builder.build(
             history=self._history,
@@ -98,17 +100,23 @@ class ConversationService:
         try:
             decision = parse_conversation_decision(response)
         except ConversationDecisionError:
-            retry_messages = self._context_builder.build(
-                history=self._history,
-                user_message=user_message,
-                memories=memories,
-                additional_system_instruction=(
-                    f"{decision_instruction}\n\nSua resposta anterior violou o contrato. "
-                    "Tente uma única vez novamente e devolva somente um dos objetos JSON "
-                    "permitidos, sem texto antes ou depois."
-                ),
-            )
-            decision = parse_conversation_decision(self._model_provider.generate(retry_messages))
+            plain_reply = _plain_decision_reply(response)
+            if plain_reply is not None:
+                decision = ReplyDecision(plain_reply)
+            else:
+                retry_messages = self._context_builder.build(
+                    history=self._history,
+                    user_message=user_message,
+                    memories=memories,
+                    additional_system_instruction=(
+                        f"{decision_instruction}\n\nSua resposta anterior violou o contrato. "
+                        "Tente uma única vez novamente e devolva somente um dos objetos JSON "
+                        "permitidos, sem texto antes ou depois."
+                    ),
+                )
+                decision = parse_conversation_decision(
+                    self._model_provider.generate(retry_messages)
+                )
         if isinstance(decision, ReplyDecision):
             self._history.append(ConversationTurn(user_message, decision.content))
             self._pending_offer = decision.offer
@@ -223,6 +231,13 @@ def _parse_event_response(
     if requires_event_ack:
         return _parse_acknowledged_event(response, event, status if requires_status_ack else None)
     return _parse_regular_event_response(response)
+
+
+def _plain_decision_reply(response: str) -> str | None:
+    normalized = response.strip()
+    if not normalized or "\0" in normalized or "{" in normalized or "}" in normalized:
+        return None
+    return normalized
 
 
 def _parse_regular_event_response(response: str) -> str:

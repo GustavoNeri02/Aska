@@ -3,6 +3,7 @@ from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
 
+from apps.cli.action_coordinator import CliActionCoordinator
 from apps.cli.command_parser import parse_input
 from apps.cli.commands import ChatMessage, ExitCommand, InvalidCommand, MemoryCommand
 from apps.cli.confirmation import ConfirmationInterpreter, ModelConfirmationInterpreter
@@ -11,9 +12,6 @@ from apps.cli.handlers import (
     NaturalFileReadHandler,
     NaturalFileSearchHandler,
     NaturalMemoryHandler,
-    NaturalOpenLocationHandler,
-    NaturalProjectLintHandler,
-    NaturalProjectTestsHandler,
     handle_memory_command,
 )
 from apps.cli.loading import run_with_loading
@@ -40,10 +38,7 @@ from packages.conversation import (
     ModelProvider,
     ModelProviderError,
     ModelTextSearchIntentInterpreter,
-    OpenWorkspaceLocationProposal,
     ReplyDecision,
-    RunProjectLintProposal,
-    RunProjectTestsProposal,
     TextSearchIntentInterpreter,
     detect_explicit_project_lint,
     is_memory_usage_question,
@@ -108,26 +103,11 @@ def run_conversation_loop(
         if file_searcher is not None and text_search_intent_interpreter is not None
         else None
     )
-    natural_open_location_handler = (
-        NaturalOpenLocationHandler(
-            open_location_capability,
-            confirmation_interpreter,
-        )
-        if open_location_capability is not None
-        else None
-    )
-    natural_project_tests_handler = (
-        NaturalProjectTestsHandler(
-            project_tests_capability,
-            confirmation_interpreter,
-        )
-        if project_tests_capability is not None
-        else None
-    )
-    natural_project_lint_handler = (
-        NaturalProjectLintHandler(project_lint_capability, confirmation_interpreter)
-        if project_lint_capability is not None
-        else None
+    action_coordinator = CliActionCoordinator.compose(
+        open_location_capability,
+        project_tests_capability,
+        project_lint_capability,
+        confirmation_interpreter,
     )
 
     while True:
@@ -154,20 +134,19 @@ def run_conversation_loop(
         try:
             if isinstance(parsed_input, MemoryCommand):
                 cancelled = natural_memory_handler.cancel_pending_for_literal_command()
-                if natural_open_location_handler is not None:
-                    natural_open_location_handler.cancel_pending_for_literal_command()
-                if natural_project_tests_handler is not None:
-                    natural_project_tests_handler.cancel_pending_for_literal_command()
-                if natural_project_lint_handler is not None:
-                    natural_project_lint_handler.cancel_pending_for_literal_command()
-                handler_result = handle_memory_command(parsed_input, memory_service)
+                cancelled_operations = list(action_coordinator.cancel_pending())
                 if cancelled is not None:
+                    operation = cancelled.facts.get("operation")
+                    if isinstance(operation, str):
+                        cancelled_operations.insert(0, operation)
+                handler_result = handle_memory_command(parsed_input, memory_service)
+                if cancelled_operations:
                     handler_result = HandlerResult(
                         handler_result.domain,
                         handler_result.kind,
                         {
                             **handler_result.facts,
-                            "cancelled_operation": cancelled.facts.get("operation"),
+                            "cancelled_operations": tuple(cancelled_operations),
                         },
                     )
                 _render_handler_result(
@@ -213,40 +192,8 @@ def run_conversation_loop(
                     )
                     continue
                 if (
-                    natural_open_location_handler is not None
-                    and (
-                        handler_result := natural_open_location_handler.handle(parsed_input.content)
-                    )
-                    is not None
-                ):
-                    _render_handler_result(
-                        handler_result,
-                        parsed_input.content,
-                        conversation_service,
-                        output_writer,
-                    )
-                    continue
-                if (
-                    natural_project_lint_handler is not None
-                    and (
-                        handler_result := natural_project_lint_handler.handle(parsed_input.content)
-                    )
-                    is not None
-                ):
-                    _render_handler_result(
-                        handler_result,
-                        parsed_input.content,
-                        conversation_service,
-                        output_writer,
-                    )
-                    continue
-                if (
-                    natural_project_tests_handler is not None
-                    and (
-                        handler_result := natural_project_tests_handler.handle(parsed_input.content)
-                    )
-                    is not None
-                ):
+                    handler_result := action_coordinator.handle_pending(parsed_input.content)
+                ) is not None:
                     _render_handler_result(
                         handler_result,
                         parsed_input.content,
@@ -256,12 +203,9 @@ def run_conversation_loop(
                     continue
                 explicit_lint = detect_explicit_project_lint(parsed_input.content)
                 if explicit_lint is not None:
-                    if natural_project_lint_handler is not None:
-                        handler_result = natural_project_lint_handler.handle_proposal(
-                            explicit_lint, parsed_input.content
-                        )
-                    else:
-                        handler_result = HandlerResult("project_lint", "unavailable")
+                    handler_result = action_coordinator.dispatch(
+                        explicit_lint, parsed_input.content
+                    )
                     _render_handler_result(
                         handler_result,
                         parsed_input.content,
@@ -269,70 +213,18 @@ def run_conversation_loop(
                         output_writer,
                     )
                     continue
-                if (
-                    natural_open_location_handler is not None
-                    or natural_project_tests_handler is not None
-                    or natural_project_lint_handler is not None
-                ):
+                if action_coordinator.is_available:
                     decision = conversation_service.decide(parsed_input.content)
                     if isinstance(decision, ReplyDecision):
                         output_writer(f"Aska > {decision.content}")
-                    elif isinstance(decision, OpenWorkspaceLocationProposal):
-                        if natural_open_location_handler is not None:
-                            handler_result = natural_open_location_handler.handle_proposal(
-                                decision,
-                                parsed_input.content,
-                            )
-                            _render_handler_result(
-                                handler_result,
-                                parsed_input.content,
-                                conversation_service,
-                                output_writer,
-                            )
-                        else:
-                            _render_handler_result(
-                                HandlerResult("desktop", "unavailable"),
-                                parsed_input.content,
-                                conversation_service,
-                                output_writer,
-                            )
-                    elif isinstance(decision, RunProjectTestsProposal):
-                        if natural_project_tests_handler is not None:
-                            handler_result = natural_project_tests_handler.handle_proposal(
-                                decision,
-                                parsed_input.content,
-                            )
-                            _render_handler_result(
-                                handler_result,
-                                parsed_input.content,
-                                conversation_service,
-                                output_writer,
-                            )
-                        else:
-                            _render_handler_result(
-                                HandlerResult("project_tests", "unavailable"),
-                                parsed_input.content,
-                                conversation_service,
-                                output_writer,
-                            )
-                    elif isinstance(decision, RunProjectLintProposal):
-                        if natural_project_lint_handler is not None:
-                            handler_result = natural_project_lint_handler.handle_proposal(
-                                decision, parsed_input.content
-                            )
-                            _render_handler_result(
-                                handler_result,
-                                parsed_input.content,
-                                conversation_service,
-                                output_writer,
-                            )
-                        else:
-                            _render_handler_result(
-                                HandlerResult("project_lint", "unavailable"),
-                                parsed_input.content,
-                                conversation_service,
-                                output_writer,
-                            )
+                    else:
+                        handler_result = action_coordinator.dispatch(decision, parsed_input.content)
+                        _render_handler_result(
+                            handler_result,
+                            parsed_input.content,
+                            conversation_service,
+                            output_writer,
+                        )
                     continue
                 response = conversation_service.send(parsed_input.content)
                 output_writer(f"Aska > {response}")

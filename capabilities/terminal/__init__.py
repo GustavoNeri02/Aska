@@ -1,3 +1,4 @@
+from capabilities.terminal.process import FixedWorkspaceTarget
 from capabilities.terminal.project_lint import (
     PROJECT_LINT_COMMAND,
     RunProjectLintCapability,
@@ -19,6 +20,7 @@ from capabilities.terminal.subprocess_runner import PythonModuleRunner, PythonPr
 
 __all__ = [
     "PROJECT_TEST_COMMAND",
+    "FixedWorkspaceTarget",
     "ProjectTestProcessResult",
     "ProjectTestRunner",
     "ProjectTestRunnerError",

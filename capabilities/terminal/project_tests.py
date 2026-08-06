@@ -7,16 +7,17 @@ from capabilities.terminal.process import (
     FixedProcessResult,
     FixedProcessRunner,
     FixedProcessTimeoutError,
+    FixedWorkspaceTarget,
+    snapshot_workspace,
+    truncate_output,
+    validate_workspace_root,
+    workspace_target_is_current,
 )
 
 PROJECT_TEST_COMMAND = ("python", "-m", "pytest", "-q")
 
 
-@dataclass(frozen=True, slots=True)
-class ProjectTestTarget:
-    workspace_root: Path
-    device: int
-    inode: int
+ProjectTestTarget = FixedWorkspaceTarget
 
 
 ProjectTestProcessResult = FixedProcessResult
@@ -51,16 +52,7 @@ class RunProjectTestsCapability:
         timeout_seconds: float = 120.0,
         max_output_chars: int = 32_768,
     ) -> None:
-        try:
-            resolved_root = workspace_root.resolve(strict=True)
-        except OSError as error:
-            raise ValueError("workspace_root must exist") from error
-        if (
-            not workspace_root.is_absolute()
-            or workspace_root != resolved_root
-            or not workspace_root.is_dir()
-        ):
-            raise ValueError("workspace_root must be an absolute resolved directory")
+        validate_workspace_root(workspace_root)
         if timeout_seconds <= 0 or timeout_seconds > 900:
             raise ValueError("timeout_seconds must be between 0 and 900")
         if max_output_chars <= 0 or max_output_chars > 262_144:
@@ -79,15 +71,14 @@ class RunProjectTestsCapability:
         return self._timeout_seconds
 
     def prepare(self) -> ProjectTestTarget:
-        stat = self._workspace_root.stat()
-        return ProjectTestTarget(self._workspace_root, stat.st_dev, stat.st_ino)
+        return snapshot_workspace(self._workspace_root)
 
     def run(self, target: ProjectTestTarget) -> RunProjectTestsResult:
         try:
-            current = self.prepare()
+            target_is_current = workspace_target_is_current(self._workspace_root, target)
         except OSError:
             return RunProjectTestsResult(RunProjectTestsStatus.TARGET_CHANGED)
-        if current != target:
+        if not target_is_current:
             return RunProjectTestsResult(RunProjectTestsStatus.TARGET_CHANGED)
         try:
             process_result = self._runner.run(
@@ -99,8 +90,8 @@ class RunProjectTestsCapability:
         except ProjectTestRunnerError:
             return RunProjectTestsResult(RunProjectTestsStatus.START_FAILED)
 
-        stdout, stdout_truncated = self._truncate(process_result.stdout)
-        stderr, stderr_truncated = self._truncate(process_result.stderr)
+        stdout, stdout_truncated = truncate_output(process_result.stdout, self._max_output_chars)
+        stderr, stderr_truncated = truncate_output(process_result.stderr, self._max_output_chars)
         status = (
             RunProjectTestsStatus.SUCCESS
             if process_result.exit_code == 0
@@ -113,8 +104,3 @@ class RunProjectTestsCapability:
             stderr=stderr,
             output_truncated=stdout_truncated or stderr_truncated,
         )
-
-    def _truncate(self, output: str) -> tuple[str, bool]:
-        if len(output) <= self._max_output_chars:
-            return output, False
-        return output[: self._max_output_chars], True

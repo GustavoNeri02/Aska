@@ -68,7 +68,9 @@ class NaturalOpenLocationHandler:
         if self._pending is not None:
             self._pending = None
             return HandlerResult(
-                "desktop", "open_location_cancelled", {"reason": "literal_command"}
+                "desktop",
+                "open_location_cancelled",
+                {"operation": "open_workspace_location", "reason": "literal_command"},
             )
         return None
 

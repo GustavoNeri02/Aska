@@ -50,7 +50,7 @@ def test_decide_returns_reply_and_records_clean_conversation_history(
 def test_decide_retries_invalid_contract_once(tmp_path: Path) -> None:
     provider = SequencedProvider(
         [
-            "resposta livre inválida",
+            '{"type":"capability_proposal","action":"ação_desconhecida"}',
             '{"type":"reply","content":"O Ruff retornou All checks passed."}',
         ]
     )
@@ -61,6 +61,19 @@ def test_decide_retries_invalid_contract_once(tmp_path: Path) -> None:
     assert decision == ReplyDecision("O Ruff retornou All checks passed.")
     assert len(provider.messages) == 2
     assert "resposta anterior violou o contrato" in provider.messages[1][0].content
+
+
+def test_decide_accepts_plain_conversation_as_safe_reply_without_retry(
+    tmp_path: Path,
+) -> None:
+    provider = FakeProvider("Não entendi muito bem, mas estou aqui.")
+    service = ConversationService(provider, create_temp_memory_service(tmp_path))
+
+    decision = service.decide("baah")
+
+    assert decision == ReplyDecision("Não entendi muito bem, mas estou aqui.")
+    assert len(provider.messages) == 1
+    assert service.history[0].assistant_message == "Não entendi muito bem, mas estou aqui."
 
 
 def test_decide_returns_proposal_without_recording_execution_as_history(
@@ -111,6 +124,30 @@ def test_reply_can_keep_a_typed_offer_for_the_next_turn(tmp_path: Path) -> None:
     assert second == RunProjectTestsProposal()
     assert "Oferta tipada pendente" in provider.messages[1][0].content
     assert '"action": "run_project_tests"' in provider.messages[1][0].content
+
+
+def test_pending_offer_accepts_plain_refusal_as_safe_reply_without_retry(
+    tmp_path: Path,
+) -> None:
+    provider = SequencedProvider(
+        [
+            '{"type":"reply","content":"Posso executar a suíte inteira.",'
+            '"offer":{"action":"run_project_tests"}}',
+            "Tudo bem, não vou executar os testes.",
+            '{"type":"reply","content":"Em que posso ajudar?"}',
+        ]
+    )
+    service = ConversationService(provider, create_temp_memory_service(tmp_path))
+
+    service.decide("Rode apenas o primeiro teste.")
+    refusal = service.decide("Não, pode deixar.")
+    following_turn = service.decide("E agora?")
+
+    assert refusal == ReplyDecision("Tudo bem, não vou executar os testes.")
+    assert following_turn == ReplyDecision("Em que posso ajudar?")
+    assert len(provider.messages) == 3
+    assert "Oferta tipada pendente" in provider.messages[1][0].content
+    assert "Oferta tipada pendente" not in provider.messages[2][0].content
 
 
 def test_external_event_is_presented_by_model_and_recorded_as_aska_reply(
@@ -232,7 +269,6 @@ def test_decide_receives_existing_history_and_memories(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "response",
     [
-        "resposta livre",
         '{"type":"reply","content":""}',
         '{"type":"reply","content":"ok","extra":true}',
         '{"type":"capability_proposal","action":"run","path":"."}',

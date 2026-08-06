@@ -2,13 +2,17 @@ from dataclasses import dataclass
 
 from apps.cli.confirmation import ConfirmationDecision, ConfirmationInterpreter, parse_confirmation
 from apps.cli.handler_result import HandlerResult
-from capabilities.terminal import ProjectTestTarget, RunProjectLintCapability, RunProjectLintResult
+from capabilities.terminal import (
+    FixedWorkspaceTarget,
+    RunProjectLintCapability,
+    RunProjectLintResult,
+)
 from packages.conversation import RunProjectLintProposal
 
 
 @dataclass(frozen=True, slots=True)
 class _PendingProjectLint:
-    target: ProjectTestTarget
+    target: FixedWorkspaceTarget
     user_message: str
 
 
@@ -65,7 +69,7 @@ class NaturalProjectLintHandler:
         if self._pending is None:
             return None
         self._pending = None
-        return HandlerResult("project_lint", "cancelled")
+        return HandlerResult("project_lint", "cancelled", {"operation": "run_project_lint"})
 
 
 def _event_facts(result: RunProjectLintResult) -> dict[str, object]:

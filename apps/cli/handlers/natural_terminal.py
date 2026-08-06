@@ -92,7 +92,7 @@ class NaturalProjectTestsHandler:
     def cancel_pending_for_literal_command(self) -> HandlerResult | None:
         if self._pending is not None:
             self._pending = None
-            return HandlerResult("project_tests", "cancelled")
+            return HandlerResult("project_tests", "cancelled", {"operation": "run_project_tests"})
         return None
 
 

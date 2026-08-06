@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from apps.cli.app import run_conversation_loop
+from capabilities.terminal import ProjectTestProcessResult, RunProjectLintCapability
 from packages.conversation import AddMemoryIntent, EditMemoryIntent, ModelMessage
 from tests.cli_support import (
     FakeMemoryIntentInterpreter,
@@ -131,3 +132,28 @@ def test_memory_edit_snapshot_conflict_is_reported_as_fact(tmp_path: Path) -> No
 
     assert service.list()[0].content == "Uso Dart"
     assert '"status": "conflict"' in provider.messages[1][-1].content
+
+
+def test_literal_memory_command_records_cancelled_pending_action(tmp_path: Path) -> None:
+    class Runner:
+        def run(self, workspace_root: Path, timeout_seconds: float) -> ProjectTestProcessResult:
+            del workspace_root, timeout_seconds
+            return ProjectTestProcessResult(0, "", "")
+
+    provider = SequencedProvider(
+        [
+            '{"type":"event_reply","acknowledged_domain":"project_lint",'
+            '"acknowledged_kind":"confirmation_required","content":"Confirma?"}',
+            "Listei.",
+        ]
+    )
+
+    run_conversation_loop(
+        provider,
+        create_temp_memory_service(tmp_path),
+        project_lint_capability=RunProjectLintCapability(tmp_path.resolve(), Runner()),
+        input_reader=create_input_reader(["rode o Ruff", "memórias", "sair"]),
+        output_writer=lambda _: None,
+    )
+
+    assert '"cancelled_operations": ["run_project_lint"]' in provider.messages[1][-1].content
