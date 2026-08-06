@@ -12,8 +12,8 @@ from packages.conversation.capability_router import (
 )
 from packages.conversation.context import ContextBuilder
 from packages.conversation.external_event import (
-    EXTERNAL_EVENT_RESPONSE_INSTRUCTION,
-    ExternalActionEvent,
+    CONVERSATION_EVENT_RESPONSE_INSTRUCTION,
+    ConversationEvent,
 )
 from packages.conversation.model import ContextDocument, ConversationTurn
 from packages.conversation.provider import ModelProvider
@@ -84,27 +84,36 @@ class ConversationService:
             self._pending_offer = None
         return decision
 
-    def respond_to_external_event(
+    def present_event(
         self,
         original_user_message: str,
-        event: ExternalActionEvent,
+        event: ConversationEvent,
     ) -> str:
         messages = self._context_builder.build(
             history=self._history,
             user_message=event.to_context_message(original_user_message),
             memories=self._memory_reader.list(),
-            additional_system_instruction=EXTERNAL_EVENT_RESPONSE_INSTRUCTION,
+            additional_system_instruction=CONVERSATION_EVENT_RESPONSE_INSTRUCTION,
         )
         response = self._model_provider.generate(messages)
-        decision = parse_conversation_decision(response)
-        if not isinstance(decision, ReplyDecision) or decision.offer is not None:
-            raise ConversationDecisionError("external event response must be a plain reply")
+        try:
+            decision = parse_conversation_decision(response)
+        except ConversationDecisionError:
+            natural_response = response.strip()
+            if not natural_response or "\0" in natural_response:
+                raise
+        else:
+            if not isinstance(decision, ReplyDecision) or decision.offer is not None:
+                raise ConversationDecisionError(
+                    "conversation event response must be a plain reply"
+                )
+            natural_response = decision.content
         self._history.append(
             ConversationTurn(
                 original_user_message.strip(),
-                decision.content,
+                natural_response,
                 event.to_context_message(original_user_message),
             )
         )
         self._pending_offer = None
-        return decision.content
+        return natural_response

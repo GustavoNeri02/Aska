@@ -2,7 +2,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 
-EXTERNAL_EVENT_RESPONSE_INSTRUCTION = "\n".join(
+CONVERSATION_EVENT_RESPONSE_INSTRUCTION = "\n".join(
     (
         "O próximo pedido contém um evento local autoritativo produzido pelo sistema.",
         "Apresente o evento naturalmente como Aska, usando o contexto da conversa.",
@@ -15,9 +15,9 @@ EXTERNAL_EVENT_RESPONSE_INSTRUCTION = "\n".join(
 
 
 @dataclass(frozen=True, slots=True)
-class ExternalActionEvent:
-    action: str
-    event: str
+class ConversationEvent:
+    domain: str
+    kind: str
     facts: Mapping[str, object]
 
     def to_context_message(self, original_request: str) -> str:

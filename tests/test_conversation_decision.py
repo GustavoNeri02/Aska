@@ -4,8 +4,8 @@ import pytest
 
 from packages.conversation import (
     ConversationDecisionError,
+    ConversationEvent,
     ConversationService,
-    ExternalActionEvent,
     ModelRole,
     OpenWorkspaceLocationProposal,
     ReplyDecision,
@@ -89,11 +89,11 @@ def test_external_event_is_presented_by_model_and_recorded_as_aska_reply(
     )
     service = ConversationService(provider, create_temp_memory_service(tmp_path))
 
-    response = service.respond_to_external_event(
+    response = service.present_event(
         "Rode os testes.",
-        ExternalActionEvent(
-            action="run_project_tests",
-            event="completed",
+        ConversationEvent(
+            domain="project_tests",
+            kind="completed",
             facts={"exit_code": 0, "stdout": "507 passed", "stderr": ""},
         ),
     )

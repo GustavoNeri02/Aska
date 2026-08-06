@@ -39,6 +39,7 @@
 - Abertura de uma pasta do workspace no Explorador do Windows está `implemented` como primeira ação externa controlada: intenção limitada, proposta com alvo exato, confirmação local, revalidação por snapshot e launcher injetável. O checkup manual ainda está pendente.
 - A decisão conversacional única está `implemented` com envelope JSON estrito de `reply` ou `capability_proposal`, catálogo fechado e o mesmo contexto de identidade, memórias e histórico. Frases exatas são somente fast paths; paráfrases podem gerar `OpenWorkspaceLocationProposal`, enquanto políticas e execução permanecem locais.
 - A execução confirmada da suíte inteira de testes está `implemented` como action sem parâmetros controlados pelo modelo. O comando fixo é `python -m pytest -q`, com workspace revalidado, `shell=False`, timeout, saída limitada e resultado real tipado. Subconjuntos não são ampliados para a suíte inteira; alternativas usam `offer` tipada, e execução ou cancelamento geram evento autoritativo apresentado pela IA e preservado para follow-ups. O checkup manual desta correção está pendente.
+- A separação de voz está `implemented` no CLI de produção: handlers de memória, filesystem, busca, desktop e terminal emitem fatos rotulados como `Sistema`; um `ConversationEvent` agrupado gera a fala natural da `Aska`. Lifecycle, controles de confirmação e fallback sem provider permanecem determinísticos. O checkup manual está pendente.
 
 ### Comportamento atual
 

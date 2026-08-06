@@ -14,6 +14,7 @@ from apps.cli.handlers import (
     handle_memory_command,
 )
 from apps.cli.loading import run_with_loading
+from apps.cli.turn_output import TurnOutput
 from capabilities.desktop import OpenWorkspaceLocationCapability, WindowsExplorerLauncher
 from capabilities.filesystem import (
     ListFilesCapability,
@@ -65,27 +66,34 @@ def run_conversation_loop(
     text_search_intent_interpreter: TextSearchIntentInterpreter | None = None,
     open_location_capability: OpenWorkspaceLocationCapability | None = None,
     project_tests_capability: RunProjectTestsCapability | None = None,
+    conversational_handler_events: bool = False,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
 ) -> None:
     output_writer(build_banner())
     output_writer("")
-    output_writer("Olá, Gustavo.")
+    output_writer("Sistema > Sessão local iniciada.")
     output_writer("")
-    output_writer("Digite 'sair' para encerrar.")
+    output_writer("Sistema > Digite 'sair' para encerrar.")
     output_writer("")
     conversation_service = ConversationService(model_provider, memory_service)
+    turn_output = TurnOutput(
+        conversation_service,
+        output_writer,
+        conversational_events=conversational_handler_events,
+    )
+    handler_writer = turn_output.write
     natural_memory_handler = NaturalMemoryHandler(
         memory_service,
         memory_intent_interpreter,
-        output_writer,
+        handler_writer,
     )
     natural_file_handler = (
         NaturalFileReadHandler(
             file_reader,
             file_intent_interpreter,
             conversation_service,
-            output_writer,
+            handler_writer,
             file_lister,
         )
         if file_reader is not None and file_intent_interpreter is not None
@@ -96,7 +104,7 @@ def run_conversation_loop(
             file_searcher,
             text_search_intent_interpreter,
             conversation_service,
-            output_writer,
+            handler_writer,
         )
         if file_searcher is not None and text_search_intent_interpreter is not None
         else None
@@ -104,7 +112,8 @@ def run_conversation_loop(
     natural_open_location_handler = (
         NaturalOpenLocationHandler(
             open_location_capability,
-            output_writer,
+            conversation_service,
+            handler_writer,
         )
         if open_location_capability is not None
         else None
@@ -113,7 +122,7 @@ def run_conversation_loop(
         NaturalProjectTestsHandler(
             project_tests_capability,
             conversation_service,
-            output_writer,
+            handler_writer,
         )
         if project_tests_capability is not None
         else None
@@ -123,7 +132,7 @@ def run_conversation_loop(
         try:
             user_input = input_reader("Você > ").strip()
         except (EOFError, KeyboardInterrupt):
-            output_writer("\nEncerrando o Aska.")
+            output_writer("\nSistema > Encerrando o Aska.")
             return
 
         if not user_input:
@@ -131,10 +140,10 @@ def run_conversation_loop(
 
         parsed_input = parse_input(user_input)
         if isinstance(parsed_input, ExitCommand):
-            output_writer("Até mais, Gustavo.")
+            output_writer("Sistema > Sessão encerrada.")
             return
         if isinstance(parsed_input, InvalidCommand):
-            output_writer(parsed_input.usage)
+            output_writer(f"Sistema > {parsed_input.usage}")
             continue
 
         try:
@@ -144,25 +153,31 @@ def run_conversation_loop(
                     natural_open_location_handler.cancel_pending_for_literal_command()
                 if natural_project_tests_handler is not None:
                     natural_project_tests_handler.cancel_pending_for_literal_command()
-                handle_memory_command(parsed_input, memory_service, output_writer)
+                handle_memory_command(parsed_input, memory_service, handler_writer)
+                turn_output.finish(user_input, domain="memory")
             elif isinstance(parsed_input, ChatMessage):
                 if natural_memory_handler.handle(parsed_input.content):
+                    turn_output.finish(parsed_input.content, domain="memory")
                     continue
                 if natural_file_search_handler is not None and natural_file_search_handler.handle(
                     parsed_input.content
                 ):
+                    turn_output.finish(parsed_input.content, domain="filesystem")
                     continue
                 if natural_file_handler is not None and natural_file_handler.handle(
                     parsed_input.content
                 ):
+                    turn_output.finish(parsed_input.content, domain="filesystem")
                     continue
                 if natural_open_location_handler is not None and (
                     natural_open_location_handler.handle(parsed_input.content)
                 ):
+                    turn_output.finish(parsed_input.content, domain="desktop")
                     continue
                 if natural_project_tests_handler is not None and (
                     natural_project_tests_handler.handle(parsed_input.content)
                 ):
+                    turn_output.finish(parsed_input.content, domain="project_tests")
                     continue
                 if (
                     natural_open_location_handler is not None
@@ -173,9 +188,12 @@ def run_conversation_loop(
                         output_writer(f"Aska > {decision.content}")
                     elif isinstance(decision, OpenWorkspaceLocationProposal):
                         if natural_open_location_handler is not None:
-                            natural_open_location_handler.handle_proposal(decision)
+                            natural_open_location_handler.handle_proposal(
+                                decision,
+                                parsed_input.content,
+                            )
                         else:
-                            output_writer("Aska > A capability solicitada não está disponível.")
+                            handler_writer("capability open_workspace_location unavailable")
                     elif isinstance(decision, RunProjectTestsProposal):
                         if natural_project_tests_handler is not None:
                             natural_project_tests_handler.handle_proposal(
@@ -183,17 +201,18 @@ def run_conversation_loop(
                                 parsed_input.content,
                             )
                         else:
-                            output_writer("Aska > A capability solicitada não está disponível.")
+                            handler_writer("capability run_project_tests unavailable")
+                    turn_output.finish(parsed_input.content, domain="capability")
                     continue
                 response = conversation_service.send(parsed_input.content)
                 output_writer(f"Aska > {response}")
         except MemoryRepositoryError as error:
-            output_writer(f"Não foi possível acessar as memórias: {error}")
+            output_writer(f"Sistema > Falha ao acessar memórias: {error}")
         except ModelProviderError as error:
-            output_writer(f"Aska > {error}")
+            output_writer(f"Sistema > Provider indisponível: {error}")
         except ConversationDecisionError:
             output_writer(
-                "Aska > Não foi possível interpretar a resposta do modelo com segurança."
+                "Sistema > Resposta do modelo inválida para o contrato esperado."
             )
 
 
@@ -206,7 +225,7 @@ def main() -> None:
         file_lister = ListFilesCapability(workspace_root)
         file_searcher = SearchTextCapability(workspace_root)
     except (OSError, ValueError):
-        print("Aska > Workspace de leitura inválido.")
+        print("Sistema > Workspace de leitura inválido.")
         return
     try:
         open_location_capability = OpenWorkspaceLocationCapability(
@@ -239,7 +258,7 @@ def main() -> None:
         try:
             run_with_loading(model_provider.warm_up, f"Carregando {model}...")
         except ModelProviderError as error:
-            print(f"Aska > {error}")
+            print(f"Sistema > Provider indisponível: {error}")
             return
         run_conversation_loop(
             model_provider,
@@ -252,6 +271,7 @@ def main() -> None:
             text_search_intent_interpreter=text_search_intent_interpreter,
             open_location_capability=open_location_capability,
             project_tests_capability=project_tests_capability,
+            conversational_handler_events=True,
         )
     finally:
         with suppress(ModelProviderError):

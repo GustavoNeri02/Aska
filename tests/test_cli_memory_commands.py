@@ -33,8 +33,8 @@ def test_conversation_handles_invalid_json_without_broken_flow(tmp_path: Path) -
         memory_service=store,
     )
 
-    assert any("Não foi possível acessar as memórias:" in message for message in output)
-    assert "Até mais, Gustavo." in output
+    assert any("Falha ao acessar memórias:" in message for message in output)
+    assert "Sistema > Sessão encerrada." in output
 
 
 def test_run_conversation_loop_uses_injected_store_without_touching_real_file(
@@ -222,7 +222,7 @@ def test_conversation_reports_guidance_for_empty_search_term(tmp_path: Path) -> 
         memory_service=store,
     )
 
-    assert "Use: buscar memória: <termo>" in output
+    assert "Sistema > Use: buscar memória: <termo>" in output
 
 
 def test_conversation_reports_duplicate_and_invalid_edit_results(
@@ -247,7 +247,7 @@ def test_conversation_reports_duplicate_and_invalid_edit_results(
     )
 
     assert "Já existe uma memória com esse conteúdo." in output
-    assert "Informe a memória atual e o novo conteúdo." in output
+    assert "Sistema > Informe a memória atual e o novo conteúdo." in output
 
 
 def test_conversation_reports_unchanged_edit_result(tmp_path: Path) -> None:
@@ -281,7 +281,7 @@ def test_conversation_reports_short_guidance_for_malformed_edit_command(tmp_path
         memory_service=store,
     )
 
-    assert "Use: editar memória: <atual> -> <novo>" in output
+    assert "Sistema > Use: editar memória: <atual> -> <novo>" in output
 
 
 def test_conversation_updates_provider_context_after_edit(tmp_path: Path) -> None:
@@ -561,7 +561,7 @@ def test_natural_name_edit_does_not_report_success_when_persistence_fails(
     )
 
     assert "Memória editada localmente." not in output
-    assert any("Não foi possível acessar as memórias:" in message for message in output)
+    assert any("Falha ao acessar memórias:" in message for message in output)
     assert store.list() == [original]
 
 
@@ -850,7 +850,7 @@ def test_interpreted_memory_add_does_not_report_success_on_persistence_failure(
     )
 
     assert "Memória registrada localmente." not in output
-    assert any("Não foi possível acessar as memórias:" in message for message in output)
+    assert any("Falha ao acessar memórias:" in message for message in output)
 
 
 def test_literal_command_cancels_pending_memory_add(tmp_path: Path) -> None:
@@ -1331,7 +1331,7 @@ def test_memory_delete_persistence_failure_does_not_report_success(
     )
 
     assert "Memória removida localmente." not in output
-    assert any("Não foi possível acessar as memórias:" in message for message in output)
+    assert any("Falha ao acessar memórias:" in message for message in output)
     assert store.list() == [original]
 
 

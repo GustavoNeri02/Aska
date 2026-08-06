@@ -86,7 +86,7 @@ def test_main_reports_ollama_warm_up_error_and_does_not_start_conversation(
 
     main()
 
-    assert "Aska > Modelo indisponível" in capsys.readouterr().out
+    assert "Sistema > Provider indisponível: Modelo indisponível" in capsys.readouterr().out
     assert conversation_started is False
 
 
@@ -127,6 +127,7 @@ def test_main_configures_file_reader_with_allowed_workspace(
         OpenWorkspaceLocationCapability,
     )
     assert isinstance(configured["project_tests_capability"], RunProjectTestsCapability)
+    assert configured["conversational_handler_events"] is True
 
 
 @pytest.mark.parametrize("workspace_kind", ["missing", "file"])
@@ -156,6 +157,6 @@ def test_main_reports_invalid_workspace_without_starting_conversation(
 
     main()
 
-    assert "Aska > Workspace de leitura inválido." in capsys.readouterr().out
+    assert "Sistema > Workspace de leitura inválido." in capsys.readouterr().out
     assert warm_up_started is False
     assert conversation_started is False

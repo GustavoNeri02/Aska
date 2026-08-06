@@ -1,9 +1,12 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 from apps.cli.app import run_conversation_loop
 from apps.cli.handlers import NaturalOpenLocationHandler
 from capabilities.desktop import OpenWorkspaceLocationCapability
 from packages.conversation import (
+    ConversationService,
+    ModelMessage,
     OpenWorkspaceLocationProposal,
 )
 from tests.cli_support import FakeProvider, create_input_reader, create_temp_memory_service
@@ -17,6 +20,16 @@ class RecordingLauncher:
         self.paths.append(path)
 
 
+class SequencedProvider:
+    def __init__(self, responses: list[str]) -> None:
+        self._responses = iter(responses)
+        self.messages: list[list[ModelMessage]] = []
+
+    def generate(self, messages: Sequence[ModelMessage]) -> str:
+        self.messages.append(list(messages))
+        return next(self._responses)
+
+
 def _create_handler(
     workspace: Path,
 ) -> tuple[NaturalOpenLocationHandler, RecordingLauncher, list[str]]:
@@ -24,6 +37,7 @@ def _create_handler(
     output: list[str] = []
     handler = NaturalOpenLocationHandler(
         OpenWorkspaceLocationCapability(workspace.resolve(), launcher),
+        ConversationService(FakeProvider(), create_temp_memory_service(workspace)),
         output.append,
     )
     return handler, launcher, output
@@ -40,7 +54,8 @@ def test_open_location_requires_confirmation_before_launch(tmp_path: Path) -> No
 
     assert handler.handle("sim") is True
     assert launcher.paths == [docs.resolve()]
-    assert output[-1] == "Pasta aberta no Explorador de Arquivos."
+    assert output[-2] == "Sistema > open_workspace_location: success"
+    assert output[-1] == "Aska > Resposta local"
 
 
 def test_open_explorer_defaults_to_workspace_root(tmp_path: Path) -> None:
@@ -74,7 +89,8 @@ def test_open_location_can_be_cancelled(tmp_path: Path) -> None:
     handler.handle("não")
 
     assert launcher.paths == []
-    assert output[-1] == "Abertura cancelada."
+    assert output[-2] == "Sistema > open_workspace_location: cancelled"
+    assert output[-1] == "Aska > Resposta local"
 
 
 def test_unknown_confirmation_keeps_proposal_pending(tmp_path: Path) -> None:
@@ -85,7 +101,7 @@ def test_unknown_confirmation_keeps_proposal_pending(tmp_path: Path) -> None:
     handler.handle("talvez")
     handler.handle("sim")
 
-    assert "Confirmação não reconhecida" in output[-2]
+    assert any("Confirmação não reconhecida" in message for message in output)
     assert len(launcher.paths) == 1
 
 
@@ -100,7 +116,7 @@ def test_changed_target_is_not_launched_after_confirmation(tmp_path: Path) -> No
     handler.handle("sim")
 
     assert launcher.paths == []
-    assert "mudou após a proposta" in output[-1]
+    assert output[-2] == "Sistema > open_workspace_location: target_changed"
 
 
 def test_outside_workspace_is_rejected_without_launch(tmp_path: Path) -> None:
@@ -109,7 +125,7 @@ def test_outside_workspace_is_rejected_without_launch(tmp_path: Path) -> None:
     assert handler.handle("Abra a pasta ../fora no Explorador.") is True
 
     assert launcher.paths == []
-    assert output[-1].startswith("Acesso negado")
+    assert output[-2] == "Sistema > open_workspace_location: outside_workspace"
 
 
 def test_absolute_explorer_target_is_rejected_locally(tmp_path: Path) -> None:
@@ -118,7 +134,7 @@ def test_absolute_explorer_target_is_rejected_locally(tmp_path: Path) -> None:
     assert handler.handle("abra o explorer em c:/") is True
 
     assert launcher.paths == []
-    assert output[-1].startswith("Acesso negado")
+    assert output[-2] == "Sistema > open_workspace_location: outside_workspace"
 
 
 def test_typed_natural_proposal_is_prepared_by_handler(tmp_path: Path) -> None:
@@ -126,7 +142,13 @@ def test_typed_natural_proposal_is_prepared_by_handler(tmp_path: Path) -> None:
     docs.mkdir()
     handler, launcher, _ = _create_handler(tmp_path)
 
-    assert handler.handle_proposal(OpenWorkspaceLocationProposal("docs")) is True
+    assert (
+        handler.handle_proposal(
+            OpenWorkspaceLocationProposal("docs"),
+            "Mostre a documentação.",
+        )
+        is True
+    )
 
     assert launcher.paths == []
 
@@ -160,8 +182,8 @@ def test_conversation_loop_routes_open_proposal_and_confirmation(tmp_path: Path)
     )
 
     assert launcher.paths == [docs.resolve()]
-    assert provider.messages == []
-    assert "Pasta aberta no Explorador de Arquivos." in output
+    assert len(provider.messages) == 1
+    assert "Aska > Resposta local" in output
 
 
 def test_conversation_loop_uses_one_model_call_for_semantic_proposal(
@@ -170,9 +192,12 @@ def test_conversation_loop_uses_one_model_call_for_semantic_proposal(
     docs = tmp_path / "docs"
     docs.mkdir()
     launcher = RecordingLauncher()
-    provider = FakeProvider(
-        '{"type":"capability_proposal",'
-        '"action":"open_workspace_location","path":"docs"}'
+    provider = SequencedProvider(
+        [
+            '{"type":"capability_proposal",'
+            '"action":"open_workspace_location","path":"docs"}',
+            '{"type":"reply","content":"Abri a pasta de documentação."}',
+        ]
     )
     output: list[str] = []
 
@@ -188,7 +213,7 @@ def test_conversation_loop_uses_one_model_call_for_semantic_proposal(
         output_writer=output.append,
     )
 
-    assert len(provider.messages) == 1
+    assert len(provider.messages) == 2
     assert launcher.paths == [docs.resolve()]
 
 
@@ -230,6 +255,6 @@ def test_invalid_decision_envelope_is_reported_without_execution(tmp_path: Path)
 
     assert launcher.paths == []
     assert (
-        "Aska > Não foi possível interpretar a resposta do modelo com segurança."
+        "Sistema > Resposta do modelo inválida para o contrato esperado."
         in output
     )

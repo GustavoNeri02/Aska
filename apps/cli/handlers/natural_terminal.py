@@ -8,8 +8,8 @@ from capabilities.terminal import (
     RunProjectTestsResult,
 )
 from packages.conversation import (
+    ConversationEvent,
     ConversationService,
-    ExternalActionEvent,
     RunProjectTestsProposal,
 )
 
@@ -48,11 +48,11 @@ class NaturalProjectTestsHandler:
         if decision is ConfirmationDecision.CANCEL:
             fact_message = "Estado local da ação: cancelled"
             self._output_writer(fact_message)
-            response = self._conversation_service.respond_to_external_event(
+            response = self._conversation_service.present_event(
                 pending.user_message,
-                ExternalActionEvent(
-                    action="run_project_tests",
-                    event="cancelled",
+                ConversationEvent(
+                    domain="project_tests",
+                    kind="cancelled",
                     facts={},
                 ),
             )
@@ -62,11 +62,11 @@ class NaturalProjectTestsHandler:
         result = self._capability.run(pending.target)
         fact_message = _present_facts(result)
         self._output_writer(fact_message)
-        response = self._conversation_service.respond_to_external_event(
+        response = self._conversation_service.present_event(
             pending.user_message,
-            ExternalActionEvent(
-                action="run_project_tests",
-                event="completed",
+            ConversationEvent(
+                domain="project_tests",
+                kind="completed",
                 facts=_event_facts(result),
             ),
         )
