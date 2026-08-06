@@ -6,9 +6,12 @@ from capabilities.terminal import (
     ProjectTestTarget,
     RunProjectTestsCapability,
     RunProjectTestsResult,
-    RunProjectTestsStatus,
 )
-from packages.conversation import ConversationService, RunProjectTestsProposal
+from packages.conversation import (
+    ConversationService,
+    ExternalActionEvent,
+    RunProjectTestsProposal,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,21 +46,31 @@ class NaturalProjectTestsHandler:
         pending = self._pending
         self._pending = None
         if decision is ConfirmationDecision.CANCEL:
-            message = "Execução dos testes cancelada."
-            self._conversation_service.record_external_result(
+            fact_message = "Estado local da ação: cancelled"
+            self._output_writer(fact_message)
+            response = self._conversation_service.respond_to_external_event(
                 pending.user_message,
-                message,
+                ExternalActionEvent(
+                    action="run_project_tests",
+                    event="cancelled",
+                    facts={},
+                ),
             )
-            self._output_writer(message)
+            self._output_writer(f"Aska > {response}")
             return True
 
         result = self._capability.run(pending.target)
-        message = _present_result(result)
-        self._conversation_service.record_external_result(
+        fact_message = _present_facts(result)
+        self._output_writer(fact_message)
+        response = self._conversation_service.respond_to_external_event(
             pending.user_message,
-            _compact_for_history(message),
+            ExternalActionEvent(
+                action="run_project_tests",
+                event="completed",
+                facts=_event_facts(result),
+            ),
         )
-        self._output_writer(message)
+        self._output_writer(f"Aska > {response}")
         return True
 
     def handle_proposal(
@@ -87,28 +100,14 @@ class NaturalProjectTestsHandler:
         if self._pending is not None:
             pending = self._pending
             self._pending = None
-            message = "Proposta de execução dos testes anterior cancelada."
-            self._conversation_service.record_external_result(
-                pending.user_message,
-                message,
-            )
-            self._output_writer(message)
+            del pending
+            self._output_writer("Estado local da ação: cancelled")
 
 
-def _present_result(result: RunProjectTestsResult) -> str:
-    if result.status is RunProjectTestsStatus.TARGET_CHANGED:
-        return "O workspace mudou após a proposta; os testes não foram executados."
-    if result.status is RunProjectTestsStatus.TIMED_OUT:
-        return "A execução dos testes excedeu o timeout e foi interrompida."
-    if result.status is RunProjectTestsStatus.START_FAILED:
-        return "Não foi possível iniciar os testes do projeto."
-
-    title = (
-        "Testes concluídos com sucesso."
-        if result.status is RunProjectTestsStatus.SUCCESS
-        else "Os testes foram executados e houve falhas."
-    )
-    sections = [title, f"Exit code: {result.exit_code}"]
+def _present_facts(result: RunProjectTestsResult) -> str:
+    sections = ["Resultado local da ação:", f"Status: {result.status.value}"]
+    if result.exit_code is not None:
+        sections.append(f"Exit code: {result.exit_code}")
     if result.stdout.strip():
         sections.append(f"stdout:\n{result.stdout.rstrip()}")
     if result.stderr.strip():
@@ -116,6 +115,16 @@ def _present_result(result: RunProjectTestsResult) -> str:
     if result.output_truncated:
         sections.append("A saída foi truncada no limite seguro configurado.")
     return "\n".join(sections)
+
+
+def _event_facts(result: RunProjectTestsResult) -> dict[str, object]:
+    return {
+        "status": result.status.value,
+        "exit_code": result.exit_code,
+        "stdout": _compact_for_history(result.stdout, 3072),
+        "stderr": _compact_for_history(result.stderr, 1024),
+        "output_truncated": result.output_truncated,
+    }
 
 
 def _compact_for_history(message: str, max_chars: int = 4096) -> str:

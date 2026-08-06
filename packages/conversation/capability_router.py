@@ -8,6 +8,8 @@ CONVERSATION_DECISION_INSTRUCTION = "\n".join(
         "Escolha entre responder normalmente e propor uma capability do catálogo fechado.",
         "Formatos permitidos:",
         '{"type":"reply","content":"sua resposta ao usuário"}',
+        '{"type":"reply","content":"sua resposta","offer":'
+        '{"action":"run_project_tests"}}',
         '{"type":"capability_proposal","action":"open_workspace_location",'
         '"path":"docs"}',
         '{"type":"capability_proposal","action":"run_project_tests"}',
@@ -22,6 +24,8 @@ CONVERSATION_DECISION_INSTRUCTION = "\n".join(
         "ação acontecer agora. Mencionar uma capability ou perguntar sobre ela não é "
         "um pedido de execução.",
         "Em caso de dúvida entre conversar e agir, escolha reply.",
+        "Quando uma reply oferecer uma capability disponível como alternativa concreta, "
+        "inclua offer com a action tipada. Não use offer para possibilidades vagas.",
         "Uma capability_proposal é apenas uma sugestão: não execute, não conceda "
         "permissões e não afirme que a ação aconteceu.",
         "Preserve no path o caminho solicitado, mesmo se parecer inseguro; a política "
@@ -39,7 +43,8 @@ CONVERSATION_DECISION_INSTRUCTION = "\n".join(
         'Entrada: rode os testes do projeto. Saída: {"type":"capability_proposal",'
         '"action":"run_project_tests"}',
         'Entrada: rode o primeiro teste do projeto. Saída: {"type":"reply",'
-        '"content":"A capability atual só pode executar a suíte inteira."}',
+        '"content":"A capability atual só pode executar a suíte inteira.",'
+        '"offer":{"action":"run_project_tests"}}',
         'Entrada: rode tests/test_app.py. Saída: {"type":"reply",'
         '"content":"A capability atual não aceita arquivo ou subconjunto de testes."}',
     )
@@ -62,6 +67,7 @@ CapabilityProposal = OpenWorkspaceLocationProposal | RunProjectTestsProposal
 @dataclass(frozen=True, slots=True)
 class ReplyDecision:
     content: str
+    offer: CapabilityProposal | None = None
 
 
 ConversationDecision = ReplyDecision | CapabilityProposal
@@ -92,6 +98,12 @@ def parse_conversation_decision(response: str) -> ConversationDecision:
         if content is None:
             raise ConversationDecisionError("reply content must be valid text")
         return ReplyDecision(content)
+    if set(data) == {"type", "content", "offer"} and data.get("type") == "reply":
+        content = _validated_reply(data.get("content"))
+        offer = _parse_offer(data.get("offer"))
+        if content is None or offer is None:
+            raise ConversationDecisionError("reply offer must be valid")
+        return ReplyDecision(content, offer)
     if set(data) == {"type", "action", "path"} and data.get(
         "type"
     ) == "capability_proposal":
@@ -116,3 +128,22 @@ def _validated_reply(value: object) -> str | None:
     if not normalized or "\0" in normalized:
         return None
     return normalized
+
+
+def _parse_offer(value: object) -> CapabilityProposal | None:
+    if value == {"action": "run_project_tests"}:
+        return RunProjectTestsProposal()
+    if isinstance(value, dict) and set(value) == {"action", "path"}:
+        if value.get("action") != "open_workspace_location":
+            return None
+        path = _validated_path(value.get("path"))
+        return OpenWorkspaceLocationProposal(path) if path is not None else None
+    return None
+
+
+def describe_capability_proposal(proposal: CapabilityProposal) -> dict[str, str]:
+    if isinstance(proposal, RunProjectTestsProposal):
+        return {"action": "run_project_tests"}
+    if isinstance(proposal, OpenWorkspaceLocationProposal):
+        return {"action": "open_workspace_location", "path": proposal.path}
+    raise TypeError("unknown capability proposal")

@@ -1,12 +1,20 @@
+import json
 from typing import Protocol
 
 from packages.conversation.capability_router import (
     CONVERSATION_DECISION_INSTRUCTION,
+    CapabilityProposal,
     ConversationDecision,
+    ConversationDecisionError,
     ReplyDecision,
+    describe_capability_proposal,
     parse_conversation_decision,
 )
 from packages.conversation.context import ContextBuilder
+from packages.conversation.external_event import (
+    EXTERNAL_EVENT_RESPONSE_INSTRUCTION,
+    ExternalActionEvent,
+)
 from packages.conversation.model import ContextDocument, ConversationTurn
 from packages.conversation.provider import ModelProvider
 from packages.memory import Memory
@@ -27,6 +35,7 @@ class ConversationService:
         self._memory_reader = memory_reader
         self._context_builder = context_builder or ContextBuilder()
         self._history: list[ConversationTurn] = []
+        self._pending_offer: CapabilityProposal | None = None
 
     @property
     def history(self) -> list[ConversationTurn]:
@@ -48,21 +57,54 @@ class ConversationService:
         return response
 
     def decide(self, user_message: str) -> ConversationDecision:
+        decision_instruction = CONVERSATION_DECISION_INSTRUCTION
+        if self._pending_offer is not None:
+            offer = json.dumps(
+                describe_capability_proposal(self._pending_offer),
+                ensure_ascii=False,
+            )
+            decision_instruction = (
+                f"{decision_instruction}\n\n"
+                "Oferta tipada pendente do turno anterior: "
+                f"{offer}. Interprete a nova mensagem em relação a essa oferta; somente "
+                "produza a proposal se o usuário a aceitar ou solicitar."
+            )
         messages = self._context_builder.build(
             history=self._history,
             user_message=user_message,
             memories=self._memory_reader.list(),
-            additional_system_instruction=CONVERSATION_DECISION_INSTRUCTION,
+            additional_system_instruction=decision_instruction,
         )
         response = self._model_provider.generate(messages)
         decision = parse_conversation_decision(response)
         if isinstance(decision, ReplyDecision):
             self._history.append(ConversationTurn(user_message, decision.content))
+            self._pending_offer = decision.offer
+        else:
+            self._pending_offer = None
         return decision
 
-    def record_external_result(self, user_message: str, result_message: str) -> None:
-        normalized_user_message = user_message.strip()
-        normalized_result = result_message.strip()
-        if not normalized_user_message or not normalized_result:
-            raise ValueError("external result turn cannot be empty")
-        self._history.append(ConversationTurn(normalized_user_message, normalized_result))
+    def respond_to_external_event(
+        self,
+        original_user_message: str,
+        event: ExternalActionEvent,
+    ) -> str:
+        messages = self._context_builder.build(
+            history=self._history,
+            user_message=event.to_context_message(original_user_message),
+            memories=self._memory_reader.list(),
+            additional_system_instruction=EXTERNAL_EVENT_RESPONSE_INSTRUCTION,
+        )
+        response = self._model_provider.generate(messages)
+        decision = parse_conversation_decision(response)
+        if not isinstance(decision, ReplyDecision) or decision.offer is not None:
+            raise ConversationDecisionError("external event response must be a plain reply")
+        self._history.append(
+            ConversationTurn(
+                original_user_message.strip(),
+                decision.content,
+                event.to_context_message(original_user_message),
+            )
+        )
+        self._pending_offer = None
+        return decision.content

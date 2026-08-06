@@ -43,7 +43,7 @@ def _create_handler(
     runner = RecordingRunner(result or ProjectTestProcessResult(0, "2 passed", ""))
     output: list[str] = []
     conversation_service = ConversationService(
-        FakeProvider(),
+        FakeProvider('{"type":"reply","content":"Os testes terminaram."}'),
         create_temp_memory_service(tmp_path),
     )
     handler = NaturalProjectTestsHandler(
@@ -68,8 +68,9 @@ def test_project_tests_require_confirmation_and_show_fixed_operation(
     handler.handle("sim")
 
     assert runner.calls == [(tmp_path.resolve(), 30)]
-    assert "Testes concluídos com sucesso." in output[-1]
-    assert "2 passed" in output[-1]
+    assert "Status: success" in output[-2]
+    assert "2 passed" in output[-2]
+    assert output[-1] == "Aska > Os testes terminaram."
 
 
 def test_project_tests_can_be_cancelled(tmp_path: Path) -> None:
@@ -79,7 +80,8 @@ def test_project_tests_can_be_cancelled(tmp_path: Path) -> None:
     handler.handle("naum")
 
     assert runner.calls == []
-    assert output[-1] == "Execução dos testes cancelada."
+    assert output[-2] == "Estado local da ação: cancelled"
+    assert output[-1] == "Aska > Os testes terminaram."
 
 
 def test_failed_tests_report_real_exit_code_and_output(tmp_path: Path) -> None:
@@ -91,16 +93,19 @@ def test_failed_tests_report_real_exit_code_and_output(tmp_path: Path) -> None:
     handler.handle_proposal(RunProjectTestsProposal(), "Rode os testes.")
     handler.handle("sim")
 
-    assert "houve falhas" in output[-1]
-    assert "Exit code: 1" in output[-1]
-    assert "failure detail" in output[-1]
+    assert "Status: tests_failed" in output[-2]
+    assert "Exit code: 1" in output[-2]
+    assert "failure detail" in output[-2]
 
 
 def test_large_result_is_compacted_only_in_conversation_history(tmp_path: Path) -> None:
     long_output = f"start-{'x' * 5000}-end"
     runner = RecordingRunner(ProjectTestProcessResult(1, long_output, ""))
+    provider = FakeProvider(
+        '{"type":"reply","content":"Os testes terminaram com falhas."}'
+    )
     conversation_service = ConversationService(
-        FakeProvider(),
+        provider,
         create_temp_memory_service(tmp_path),
     )
     displayed: list[str] = []
@@ -113,21 +118,25 @@ def test_large_result_is_compacted_only_in_conversation_history(tmp_path: Path) 
     handler.handle_proposal(RunProjectTestsProposal(), "Rode os testes.")
     handler.handle("sim")
 
-    assert long_output in displayed[-1]
-    history_result = conversation_service.history[-1].assistant_message
-    assert len(history_result) <= 4096
-    assert "resultado compactado" in history_result
-    assert "start-" in history_result
-    assert "-end" in history_result
+    assert long_output in displayed[-2]
+    history_turn = conversation_service.history[-1]
+    assert history_turn.assistant_message == "Os testes terminaram com falhas."
+    assert history_turn.external_context is not None
+    assert "resultado compactado" in history_turn.external_context
+    assert "start-" in history_turn.external_context
+    assert "-end" in history_turn.external_context
 
 
-def test_conversation_loop_routes_project_tests_with_one_model_call(
+def test_conversation_loop_routes_and_presents_project_tests_with_model(
     tmp_path: Path,
 ) -> None:
     runner = RecordingRunner(ProjectTestProcessResult(0, "504 passed", ""))
     capability = RunProjectTestsCapability(tmp_path.resolve(), runner)
-    provider = FakeProvider(
-        '{"type":"capability_proposal","action":"run_project_tests"}'
+    provider = SequencedProvider(
+        [
+            '{"type":"capability_proposal","action":"run_project_tests"}',
+            '{"type":"reply","content":"Os 504 testes passaram."}',
+        ]
     )
     output: list[str] = []
 
@@ -139,7 +148,7 @@ def test_conversation_loop_routes_project_tests_with_one_model_call(
         output_writer=output.append,
     )
 
-    assert len(provider.messages) == 1
+    assert len(provider.messages) == 2
     assert len(runner.calls) == 1
     assert any("504 passed" in message for message in output)
 
@@ -149,6 +158,7 @@ def test_follow_up_receives_real_project_test_result_in_history(tmp_path: Path) 
     provider = SequencedProvider(
         [
             '{"type":"capability_proposal","action":"run_project_tests"}',
+            '{"type":"reply","content":"A suíte terminou: 504 passaram."}',
             '{"type":"reply","content":"Os 504 testes passaram."}',
         ]
     )
@@ -164,7 +174,7 @@ def test_follow_up_receives_real_project_test_result_in_history(tmp_path: Path) 
         output_writer=output.append,
     )
 
-    follow_up_request = provider.messages[1]
+    follow_up_request = provider.messages[2]
     assert [message.role for message in follow_up_request[1:]] == [
         ModelRole.USER,
         ModelRole.ASSISTANT,
@@ -173,3 +183,30 @@ def test_follow_up_receives_real_project_test_result_in_history(tmp_path: Path) 
     assert follow_up_request[1].content == "Rode os testes do projeto."
     assert "504 passed" in follow_up_request[2].content
     assert "Aska > Os 504 testes passaram." in output
+
+
+def test_user_can_accept_typed_alternative_from_previous_reply(tmp_path: Path) -> None:
+    runner = RecordingRunner(ProjectTestProcessResult(0, "507 passed", ""))
+    provider = SequencedProvider(
+        [
+            '{"type":"reply","content":"Só consigo rodar a suíte inteira.",'
+            '"offer":{"action":"run_project_tests"}}',
+            '{"type":"capability_proposal","action":"run_project_tests"}',
+            '{"type":"reply","content":"Pronto, os 507 testes passaram."}',
+        ]
+    )
+    output: list[str] = []
+
+    run_conversation_loop(
+        provider,
+        create_temp_memory_service(tmp_path),
+        project_tests_capability=RunProjectTestsCapability(tmp_path.resolve(), runner),
+        input_reader=create_input_reader(
+            ["Rode o primeiro teste.", "Hmm, pode ser.", "sim", "sair"]
+        ),
+        output_writer=output.append,
+    )
+
+    assert "Oferta tipada pendente" in provider.messages[1][0].content
+    assert len(runner.calls) == 1
+    assert "Aska > Pronto, os 507 testes passaram." in output

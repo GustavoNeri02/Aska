@@ -33,7 +33,14 @@ class ContextBuilder:
         messages = [ModelMessage(ModelRole.SYSTEM, system_content)]
         for turn in history:
             messages.append(ModelMessage(ModelRole.USER, turn.user_message))
-            messages.append(ModelMessage(ModelRole.ASSISTANT, turn.assistant_message))
+            assistant_content = turn.assistant_message
+            if turn.external_context is not None:
+                assistant_content = (
+                    f"{assistant_content}\n\n"
+                    "Contexto local autoritativo associado a esta resposta:\n"
+                    f"{turn.external_context}"
+                )
+            messages.append(ModelMessage(ModelRole.ASSISTANT, assistant_content))
 
         if context_document is not None:
             messages.append(

@@ -24,6 +24,7 @@ class ModelMessage:
 class ConversationTurn:
     user_message: str
     assistant_message: str
+    external_context: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

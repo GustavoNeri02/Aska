@@ -5,6 +5,7 @@ import pytest
 from packages.conversation import (
     ConversationDecisionError,
     ConversationService,
+    ExternalActionEvent,
     ModelRole,
     OpenWorkspaceLocationProposal,
     ReplyDecision,
@@ -61,6 +62,48 @@ def test_decide_returns_fixed_project_tests_proposal(tmp_path: Path) -> None:
     assert service.history == []
 
 
+def test_reply_can_keep_a_typed_offer_for_the_next_turn(tmp_path: Path) -> None:
+    provider = FakeProvider(
+        '{"type":"reply","content":"Posso executar a suíte inteira.",'
+        '"offer":{"action":"run_project_tests"}}'
+    )
+    service = ConversationService(provider, create_temp_memory_service(tmp_path))
+
+    first = service.decide("Rode apenas o primeiro teste.")
+    provider.response = (
+        '{"type":"capability_proposal","action":"run_project_tests"}'
+    )
+    second = service.decide("Pode ser.")
+
+    assert first == ReplyDecision("Posso executar a suíte inteira.", RunProjectTestsProposal())
+    assert second == RunProjectTestsProposal()
+    assert "Oferta tipada pendente" in provider.messages[1][0].content
+    assert '"action": "run_project_tests"' in provider.messages[1][0].content
+
+
+def test_external_event_is_presented_by_model_and_recorded_as_aska_reply(
+    tmp_path: Path,
+) -> None:
+    provider = FakeProvider(
+        '{"type":"reply","content":"Tudo certo: os 507 testes passaram."}'
+    )
+    service = ConversationService(provider, create_temp_memory_service(tmp_path))
+
+    response = service.respond_to_external_event(
+        "Rode os testes.",
+        ExternalActionEvent(
+            action="run_project_tests",
+            event="completed",
+            facts={"exit_code": 0, "stdout": "507 passed", "stderr": ""},
+        ),
+    )
+
+    assert response == "Tudo certo: os 507 testes passaram."
+    assert service.history[0].assistant_message == response
+    assert "evento local autoritativo" in provider.messages[0][0].content
+    assert '"exit_code": 0' in provider.messages[0][-1].content
+
+
 def test_decide_receives_existing_history_and_memories(tmp_path: Path) -> None:
     memory_service = create_temp_memory_service(tmp_path)
     memory_service.add("O projeto atual é o Aska")
@@ -82,26 +125,6 @@ def test_decide_receives_existing_history_and_memories(tmp_path: Path) -> None:
         ModelRole.USER,
     ]
     assert request[-1].content == "Abra ela para mim."
-
-
-def test_external_result_is_available_to_next_context(tmp_path: Path) -> None:
-    provider = FakeProvider('{"type":"reply","content":"Foram 504 testes."}')
-    service = ConversationService(provider, create_temp_memory_service(tmp_path))
-    service.record_external_result(
-        "Rode os testes do projeto.",
-        "Testes concluídos com sucesso.\nExit code: 0\n504 passed",
-    )
-
-    service.decide("O que me retornou?")
-
-    request = provider.messages[0]
-    assert [message.role for message in request[1:]] == [
-        ModelRole.USER,
-        ModelRole.ASSISTANT,
-        ModelRole.USER,
-    ]
-    assert request[1].content == "Rode os testes do projeto."
-    assert "504 passed" in request[2].content
 
 
 @pytest.mark.parametrize(

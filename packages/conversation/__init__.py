@@ -7,6 +7,7 @@ from packages.conversation.capability_router import (
     RunProjectTestsProposal,
 )
 from packages.conversation.context import ContextBuilder
+from packages.conversation.external_event import ExternalActionEvent
 from packages.conversation.identity import ASKA_IDENTITY
 from packages.conversation.model import (
     ContextDocument,
@@ -66,6 +67,7 @@ __all__ = [
     "AddMemoryIntent",
     "DeleteMemoryIntent",
     "EditMemoryIntent",
+    "ExternalActionEvent",
     "ContextBuilder",
     "ContextDocument",
     "ConversationService",
