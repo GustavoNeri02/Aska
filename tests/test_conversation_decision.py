@@ -9,6 +9,7 @@ from packages.conversation import (
     ConversationService,
     ModelMessage,
     ModelRole,
+    OpenWorkspaceFileProposal,
     OpenWorkspaceLocationProposal,
     ReplyDecision,
     RunProjectLintProposal,
@@ -89,6 +90,19 @@ def test_decide_returns_proposal_without_recording_execution_as_history(
     assert decision == OpenWorkspaceLocationProposal("docs")
     assert service.history == []
     assert len(provider.messages) == 1
+
+
+def test_decide_returns_open_workspace_file_proposal(tmp_path: Path) -> None:
+    provider = FakeProvider(
+        '{"type":"capability_proposal","action":"open_workspace_file",'
+        '"path":"docs/project/roadmap.md"}'
+    )
+    service = ConversationService(provider, create_temp_memory_service(tmp_path))
+
+    decision = service.decide("Abra o roadmap.")
+
+    assert decision == OpenWorkspaceFileProposal("docs/project/roadmap.md")
+    assert service.history == []
 
 
 def test_decide_returns_fixed_project_tests_proposal(tmp_path: Path) -> None:

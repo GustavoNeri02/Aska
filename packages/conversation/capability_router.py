@@ -9,11 +9,15 @@ CONVERSATION_DECISION_INSTRUCTION = "\n".join(
         '{"type":"reply","content":"sua resposta ao usuário"}',
         '{"type":"reply","content":"sua resposta","offer":{"action":"run_project_tests"}}',
         '{"type":"capability_proposal","action":"open_workspace_location","path":"docs"}',
+        '{"type":"capability_proposal","action":"open_workspace_file","path":"README.md"}',
         '{"type":"capability_proposal","action":"run_project_tests"}',
         '{"type":"capability_proposal","action":"run_project_lint"}',
         "Capability disponível:",
         "- open_workspace_location: abre uma pasta relativa do workspace no Explorador "
         "de Arquivos. Use path='.' quando o pedido for apenas abrir o Explorador.",
+        "- open_workspace_file: abre no aplicativo padrão um arquivo relativo do workspace ou "
+        "um caminho absoluto explicitamente informado pelo usuário. Não use para executáveis, "
+        "scripts ou pastas.",
         "- run_project_tests: executa a operação fixa python -m pytest -q na raiz do "
         "workspace e sempre roda a suíte inteira. Não aceita subconjunto, arquivo, nome "
         "de teste, comando, caminho, opção ou argumento do usuário.",
@@ -40,6 +44,8 @@ CONVERSATION_DECISION_INSTRUCTION = "\n".join(
         '"content":"Depende do caminho escolhido pelo usuário."}',
         'Entrada: abra o Explorer. Saída: {"type":"capability_proposal",'
         '"action":"open_workspace_location","path":"."}',
+        'Entrada: abra o README. Saída: {"type":"capability_proposal",'
+        '"action":"open_workspace_file","path":"README.md"}',
         'Entrada: rode os testes do projeto. Saída: {"type":"capability_proposal",'
         '"action":"run_project_tests"}',
         'Entrada: rode o primeiro teste do projeto. Saída: {"type":"reply",'
@@ -59,6 +65,11 @@ class OpenWorkspaceLocationProposal:
 
 
 @dataclass(frozen=True, slots=True)
+class OpenWorkspaceFileProposal:
+    path: str
+
+
+@dataclass(frozen=True, slots=True)
 class RunProjectTestsProposal:
     pass
 
@@ -69,7 +80,10 @@ class RunProjectLintProposal:
 
 
 CapabilityProposal = (
-    OpenWorkspaceLocationProposal | RunProjectTestsProposal | RunProjectLintProposal
+    OpenWorkspaceLocationProposal
+    | OpenWorkspaceFileProposal
+    | RunProjectTestsProposal
+    | RunProjectLintProposal
 )
 
 
@@ -114,11 +128,13 @@ def parse_conversation_decision(response: str) -> ConversationDecision:
             raise ConversationDecisionError("reply offer must be valid")
         return ReplyDecision(content, offer)
     if set(data) == {"type", "action", "path"} and data.get("type") == "capability_proposal":
-        if data.get("action") != "open_workspace_location":
+        if data.get("action") not in {"open_workspace_location", "open_workspace_file"}:
             raise ConversationDecisionError("unknown capability action")
         path = _validated_path(data.get("path"))
         if path is None:
             raise ConversationDecisionError("proposal path must be valid text")
+        if data.get("action") == "open_workspace_file":
+            return OpenWorkspaceFileProposal(path)
         return OpenWorkspaceLocationProposal(path)
     if data == {
         "type": "capability_proposal",
@@ -159,4 +175,6 @@ def describe_capability_proposal(proposal: CapabilityProposal) -> dict[str, str]
         return {"action": "run_project_lint"}
     if isinstance(proposal, OpenWorkspaceLocationProposal):
         return {"action": "open_workspace_location", "path": proposal.path}
+    if isinstance(proposal, OpenWorkspaceFileProposal):
+        return {"action": "open_workspace_file", "path": proposal.path}
     raise TypeError("unknown capability proposal")

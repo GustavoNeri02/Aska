@@ -11,7 +11,7 @@ from apps.cli.handlers import (
     NaturalMemoryHandler,
     handle_memory_command,
 )
-from capabilities.desktop import OpenWorkspaceLocationCapability
+from capabilities.desktop import OpenWorkspaceFileCapability, OpenWorkspaceLocationCapability
 from capabilities.filesystem import (
     ListFilesCapability,
     ReadTextFileCapability,
@@ -105,6 +105,8 @@ class CliSession:
             return
 
         result = self._memory_handler.handle(content)
+        if result is None:
+            result = self._actions.handle_explicit(content)
         if result is None and self._file_search_handler is not None:
             result = self._file_search_handler.handle(content)
         if result is None and self._file_handler is not None:
@@ -155,6 +157,7 @@ def run_conversation_loop(
     file_searcher: SearchTextCapability | None = None,
     text_search_intent_interpreter: TextSearchIntentInterpreter | None = None,
     open_location_capability: OpenWorkspaceLocationCapability | None = None,
+    open_file_capability: OpenWorkspaceFileCapability | None = None,
     project_tests_capability: RunProjectTestsCapability | None = None,
     project_lint_capability: RunProjectLintCapability | None = None,
     confirmation_interpreter: ConfirmationInterpreter | None = None,
@@ -179,6 +182,8 @@ def run_conversation_loop(
         else None,
         CliActionCoordinator.compose(
             open_location_capability,
+            open_file_capability,
+            file_lister,
             project_tests_capability,
             project_lint_capability,
             confirmation_interpreter,

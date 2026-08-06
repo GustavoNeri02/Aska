@@ -6,6 +6,7 @@ import pytest
 from packages.conversation import (
     ASKA_IDENTITY,
     ContextDocument,
+    ConversationEvent,
     ConversationService,
     ConversationTurn,
     ModelMessage,
@@ -139,6 +140,29 @@ def test_memory_usage_report_exposes_exact_last_selection(tmp_path: Path) -> Non
     assert '"selection_reasons"' in provider.requests[1][-1].content
     assert '"matched_terms": ["gosto"]' in provider.requests[1][-1].content
     assert '"match_kinds": ["exact"]' in provider.requests[1][-1].content
+
+
+def test_security_refusal_requires_exact_status_acknowledgement(tmp_path: Path) -> None:
+    provider = RecordingProvider()
+    provider.response = (
+        '{"type":"event_reply","acknowledged_domain":"desktop",'
+        '"acknowledged_kind":"open_file_refused",'
+        '"content":"Não posso abrir arquivos fora do workspace."}'
+    )
+    conversation = ConversationService(provider, create_memory_service(tmp_path))
+
+    response = conversation.present_event(
+        "abra C:\\outside.png",
+        ConversationEvent(
+            "desktop",
+            "open_file_refused",
+            {"path": "C:\\outside.png", "status": "outside_workspace"},
+        ),
+    )
+
+    assert response == "Não posso abrir arquivos fora do workspace."
+    assert "Explique exatamente a recusa local" in provider.requests[0][0].content
+    assert "acknowledged_status" not in provider.requests[0][0].content
 
 
 def test_memory_reason_question_reuses_selection_without_new_retrieval(

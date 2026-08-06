@@ -26,9 +26,9 @@ Documentos temáticos em Markdown são a fonte de verdade. O espelho JSON foi re
 
 O primeiro adaptador usa a API HTTP local do Ollama atrás do contrato `ModelProvider`. A integração utiliza a biblioteca padrão do Python, sem SDK ou dependência de runtime, e não impede adaptadores futuros.
 
-### Gemma 3 12B como primeiro modelo local — `implemented`
+### Gemma 4 12B como primeiro modelo local — `implemented`
 
-O modelo padrão é `gemma3:12b`, adequado à GPU principal com 16 GB de VRAM. A escolha permanece configurável por `ASKA_MODEL` e não faz parte do contrato interno.
+O modelo padrão é `gemma4:12b`, adequado à GPU principal com 16 GB de VRAM. A escolha permanece configurável por `ASKA_MODEL` e não faz parte do contrato interno.
 
 ### Memória persistente local explícita — `implemented`
 
@@ -92,7 +92,11 @@ Quando uma localização explícita por nome e extensão não encontra resultado
 
 ### Primeira ação externa e roteamento semântico de proposals — `implemented`
 
-A primeira ação no computador abre somente uma pasta existente e confinada a `ASKA_WORKSPACE_ROOT` no Explorador de Arquivos do Windows. `ConversationService.decide()` usa identidade, memórias e histórico para pedir ao provider um único envelope JSON estrito de `reply` ou `capability_proposal`; o catálogo implementado contém `open_workspace_location`, `run_project_tests` e `run_project_lint`. Como fallback seguro, texto livre válido é tratado apenas como `ReplyDecision`; nunca é convertido em proposal ou autorização. Envelopes malformados continuam sujeitos à correção e rejeição. Detectores locais cobrem comandos exatos apenas como fast paths. O modelo não executa, não escolhe aplicativos e não concede acesso. `OpenWorkspaceLocationCapability` separa preparação e execução, guarda o caminho resolvido e a identidade do diretório como snapshot e revalida tudo depois da confirmação. Mudança do alvo cancela a execução. `LocationLauncher` é o limite injetável e o adaptador atual chama um `explorer.exe` previamente resolvido com `shell=False` e argumentos separados.
+A primeira ação no computador abre somente uma pasta existente e confinada a `ASKA_WORKSPACE_ROOT` no Explorador de Arquivos do Windows. `ConversationService.decide()` usa identidade, memórias e histórico para pedir ao provider um único envelope JSON estrito de `reply` ou `capability_proposal`; o catálogo implementado contém `open_workspace_location`, `open_workspace_file`, `run_project_tests` e `run_project_lint`. Como fallback seguro, texto livre válido é tratado apenas como `ReplyDecision`; nunca é convertido em proposal ou autorização. Envelopes malformados continuam sujeitos à correção e rejeição. Detectores locais cobrem comandos exatos apenas como fast paths. O modelo não executa, não escolhe aplicativos e não concede acesso. `OpenWorkspaceLocationCapability` separa preparação e execução, guarda o caminho resolvido e a identidade do diretório como snapshot e revalida tudo depois da confirmação. Mudança do alvo cancela a execução. `LocationLauncher` é o limite injetável e o adaptador atual chama um `explorer.exe` previamente resolvido com `shell=False` e argumentos separados.
+
+### Abertura confirmada de arquivo no aplicativo padrão — `implemented`
+
+`open_workspace_file` recebe um caminho e não permite ao modelo escolher aplicativo, permissão ou argumento. Caminhos relativos são confinados ao workspace e podem reutilizar listagem e matcher aproximado; caminhos absolutos precisam ser explicitamente fornecidos e não participam de descoberta. Zero ou múltiplas correspondências não são escolhidas automaticamente. A capability aceita apenas arquivo regular, bloqueia extensões executáveis, scripts, atalhos `.lnk` e assinatura PE, mas permite `.url` mediante a mesma confirmação e revalidação. Ela guarda snapshot com identidade, tamanho e modificação. Após confirmação local, revalida o target e usa um `FileLauncher` injetável; no Windows, `os.startfile` delega ao aplicativo padrão sem shell. Pastas, travessia relativa e tipos bloqueados são recusados.
 
 O CLI apresenta aplicativo e pasta exatos antes da confirmação. Toda resposta à proposta passa por um intérprete do modelo com saída fechada em `confirm`, `cancel` ou `unknown`; isso permite linguagem natural sem transformar frases cadastradas em vocabulário obrigatório. Estados, políticas e efeitos continuam em handlers específicos: saída inválida ou ambígua vira `unknown`, e somente o código local revalida e executa. O envelope é extensível por uniões tipadas explícitas, não por descoberta dinâmica: não foi introduzido registry, planner, manifesto ou executor genérico. Somente replies reais entram automaticamente no histórico; proposals não são registradas como ações concluídas. Abertura arbitrária de aplicativos ou arquivos, comandos, shell, mouse, teclado, navegador e interação desktop geral continuam `planned`.
 

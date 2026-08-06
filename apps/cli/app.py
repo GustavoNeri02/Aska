@@ -5,7 +5,12 @@ from pathlib import Path
 from apps.cli.confirmation import ModelConfirmationInterpreter
 from apps.cli.conversation_loop import build_banner, run_conversation_loop
 from apps.cli.loading import run_with_loading
-from capabilities.desktop import OpenWorkspaceLocationCapability, WindowsExplorerLauncher
+from capabilities.desktop import (
+    OpenWorkspaceFileCapability,
+    OpenWorkspaceLocationCapability,
+    WindowsDefaultFileLauncher,
+    WindowsExplorerLauncher,
+)
 from capabilities.filesystem import (
     ListFilesCapability,
     ReadTextFileCapability,
@@ -42,9 +47,10 @@ def main() -> None:
         return
 
     open_location_capability = _optional_open_location(workspace_root)
+    open_file_capability = _optional_open_file(workspace_root)
     project_tests_capability = _optional_project_tests(workspace_root)
     project_lint_capability = _optional_project_lint(workspace_root)
-    model = os.getenv("ASKA_MODEL", "gemma3:12b")
+    model = os.getenv("ASKA_MODEL", "gemma4:12b")
     model_provider = OllamaProvider(
         model=model,
         base_url=os.getenv("ASKA_OLLAMA_URL", "http://localhost:11434"),
@@ -69,6 +75,7 @@ def main() -> None:
             file_searcher=file_searcher,
             text_search_intent_interpreter=ModelTextSearchIntentInterpreter(model_provider),
             open_location_capability=open_location_capability,
+            open_file_capability=open_file_capability,
             project_tests_capability=project_tests_capability,
             project_lint_capability=project_lint_capability,
             confirmation_interpreter=ModelConfirmationInterpreter(model_provider),
@@ -90,6 +97,13 @@ def _optional_open_location(
 def _optional_project_tests(workspace_root: Path) -> RunProjectTestsCapability | None:
     try:
         return RunProjectTestsCapability(workspace_root, PythonProjectTestRunner())
+    except ValueError:
+        return None
+
+
+def _optional_open_file(workspace_root: Path) -> OpenWorkspaceFileCapability | None:
+    try:
+        return OpenWorkspaceFileCapability(workspace_root, WindowsDefaultFileLauncher())
     except ValueError:
         return None
 

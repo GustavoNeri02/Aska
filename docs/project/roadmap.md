@@ -24,7 +24,7 @@
 
 - Contrato mínimo de provider e adaptador HTTP para Ollama.
 - Provider injetado no CLI com tratamento de indisponibilidade.
-- Ollama e Gemma 3 12B validados com uma resposta local ponta a ponta.
+- Ollama e Gemma 4 12B validados com uma resposta local ponta a ponta.
 - O modelo carregado pelo Ollama é descarregado via API ao encerrar o CLI, respeitando o servidor configurado por `ASKA_OLLAMA_URL`.
 - O CLI exibe um loading enquanto conecta ao Ollama e carrega o modelo no início.
 - O núcleo conversacional envia identidade, histórico e mensagem atual com papéis estruturados e independentes do modelo.
@@ -37,7 +37,8 @@
 - Busca textual literal dentro de arquivos está `implemented` com intenção e handler próprios, resultados tipados por caminho e linha, limites locais e contexto temporário; seu checkup manual foi concluído com sucesso.
 - Sugestões aproximadas para localizações explícitas por nome estão `implemented` com mesma extensão, normalização local, corte conservador e sem leitura ou seleção automática; seu checkup manual foi concluído com sucesso.
 - Abertura de uma pasta do workspace no Explorador do Windows está `implemented` como primeira ação externa controlada: intenção limitada, proposta com alvo exato, confirmação local, revalidação por snapshot e launcher injetável. O checkup manual foi concluído com sucesso.
-- A decisão conversacional única está `implemented` com envelope JSON estrito de `reply` ou `capability_proposal`, catálogo fechado de desktop, testes e lint e o mesmo contexto de identidade, memórias e histórico. Frases exatas são somente fast paths; políticas e execução permanecem locais.
+- Abertura confirmada de arquivos no aplicativo padrão está `implemented` com proposal própria, descoberta e sugestões locais para caminhos relativos, snapshot e revalidação. Caminhos absolutos explicitamente fornecidos podem ser abertos sem descoberta; executáveis, scripts, atalhos `.lnk` e assinatura PE são bloqueados, enquanto `.url` é permitido mediante confirmação. O adapter não usa shell, e o checkup manual de caminho absoluto e `.url` foi concluído com sucesso.
+- A decisão conversacional única está `implemented` com envelope JSON estrito de `reply` ou `capability_proposal`, catálogo fechado de abertura de pasta, abertura de arquivo, testes e lint e o mesmo contexto de identidade, memórias e histórico. Frases exatas são somente fast paths; políticas e execução permanecem locais.
 - A execução confirmada da suíte inteira de testes está `implemented` como action sem parâmetros controlados pelo modelo. O comando fixo é `python -m pytest -q`, com workspace revalidado, `shell=False`, timeout, saída limitada e resultado real tipado. Subconjuntos não são ampliados para a suíte inteira; alternativas usam `offer` tipada, e execução ou cancelamento geram evento autoritativo apresentado pela IA e preservado para follow-ups. O checkup manual foi concluído com sucesso.
 - A verificação confirmada de lint está `implemented` como operação fixa `python -m ruff check .`, sem caminhos, opções ou correção automática controlados pelo modelo. Ela reutiliza o runner seguro de módulo Python, preservando proposal tipada, confirmação, snapshot, timeout, saída limitada e resultado autoritativo próprios. O pedido explícito usa fast path determinístico e decisões conversacionais inválidas recebem uma única tentativa corretiva. O checkup manual foi concluído com sucesso.
 - A coordenação fechada de desktop, testes e lint está `implemented` em `CliActionCoordinator`, com handlers explícitos e sem registry. Comandos literais de memória cancelam todas as ações pendentes e registram `cancelled_operations` no mesmo evento autoritativo. Testes e lint compartilham somente validação, snapshot, revalidação e truncamento do processo fixo; o checkup manual consolidado foi concluído com sucesso.
@@ -67,7 +68,7 @@ O terceiro recorte executável está `implemented`: `run_project_lint` executa s
 
 ### Escopo concluído da Fase 3
 
-Persistent Memory usa objetos com `id`, `content`, `source`, `created_at` e `updated_at` em JSON local. Repository e datasource permanecem separados; gravações são atômicas e falhas de persistência são explícitas. O usuário pode listar, buscar, criar, editar e excluir memórias por comandos literais ou por propostas naturais confirmadas, com proteção por ID e snapshot quando aplicável. A prevenção de duplicatas cobre equivalência textual superficial sem alterar o conteúdo persistido. Somente o conteúdo das memórias entra no contexto do modelo. O comportamento possui testes automatizados e a integração local foi validada ponta a ponta com Gemma 3 12B.
+Persistent Memory usa objetos com `id`, `content`, `source`, `created_at` e `updated_at` em JSON local. Repository e datasource permanecem separados; gravações são atômicas e falhas de persistência são explícitas. O usuário pode listar, buscar, criar, editar e excluir memórias por comandos literais ou por propostas naturais confirmadas, com proteção por ID e snapshot quando aplicável. A prevenção de duplicatas cobre equivalência textual superficial sem alterar o conteúdo persistido. Somente o conteúdo das memórias entra no contexto do modelo. O comportamento possui testes automatizados e a integração local foi validada ponta a ponta com Gemma 4 12B.
 
 ### Limitações e evoluções planejadas
 

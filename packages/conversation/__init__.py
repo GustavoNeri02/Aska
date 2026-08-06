@@ -2,6 +2,7 @@ from packages.conversation.capability_router import (
     CapabilityProposal,
     ConversationDecision,
     ConversationDecisionError,
+    OpenWorkspaceFileProposal,
     OpenWorkspaceLocationProposal,
     ReplyDecision,
     RunProjectLintProposal,
@@ -22,7 +23,10 @@ from packages.conversation.model import (
     ModelMessage,
     ModelRole,
 )
-from packages.conversation.natural_desktop import detect_explicit_open_location
+from packages.conversation.natural_desktop import (
+    detect_explicit_open_file,
+    detect_explicit_open_location,
+)
 from packages.conversation.natural_file import (
     FileIntent,
     FileIntentInterpreter,
@@ -97,6 +101,7 @@ __all__ = [
     "ModelFileIntentInterpreter",
     "NameUpdateIntent",
     "OpenWorkspaceLocationProposal",
+    "OpenWorkspaceFileProposal",
     "PendingMemoryAdd",
     "PendingMemoryDelete",
     "PendingMemoryEdit",
@@ -115,6 +120,7 @@ __all__ = [
     "detect_explicit_file_read",
     "detect_explicit_file_location",
     "detect_explicit_open_location",
+    "detect_explicit_open_file",
     "detect_explicit_project_lint",
     "detect_known_document_query",
     "detect_known_memory_file_location",

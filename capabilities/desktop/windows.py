@@ -23,3 +23,8 @@ class WindowsExplorerLauncher:
             shell=False,
             close_fds=True,
         )
+
+
+class WindowsDefaultFileLauncher:
+    def open(self, path: Path) -> None:
+        os.startfile(path)  # noqa: S606

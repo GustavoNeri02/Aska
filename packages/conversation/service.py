@@ -142,14 +142,16 @@ class ConversationService:
         memories = selection.memories
         status = event.facts.get("status")
         requires_status_ack = (
-            event.domain in {"project_tests", "project_lint"}
+            isinstance(status, str)
+            and event.domain in {"project_tests", "project_lint"}
             and event.kind == "completed"
-            and isinstance(status, str)
         )
         requires_event_ack = requires_status_ack or event.kind in {
             "confirmation_required",
             "memory_usage_report",
             "invalid_command",
+            "open_file_refused",
+            "open_location_refused",
         }
         event_instruction = CONVERSATION_EVENT_RESPONSE_INSTRUCTION
         if requires_event_ack:
@@ -171,6 +173,11 @@ class ConversationService:
                 event_instruction = (
                     f"{event_instruction} Responda diretamente listando exatamente as memórias "
                     "do evento e explique os motivos fornecidos, ou diga que nenhuma foi usada."
+                )
+            elif event.kind in {"open_file_refused", "open_location_refused"}:
+                event_instruction = (
+                    f"{event_instruction} Explique exatamente a recusa local indicada por status. "
+                    "Não atribua a falha a permissões, arquivo ausente ou outro motivo diferente."
                 )
         messages = self._context_builder.build(
             history=self._history,
