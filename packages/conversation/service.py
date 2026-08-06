@@ -76,7 +76,20 @@ class ConversationService:
             additional_system_instruction=decision_instruction,
         )
         response = self._model_provider.generate(messages)
-        decision = parse_conversation_decision(response)
+        try:
+            decision = parse_conversation_decision(response)
+        except ConversationDecisionError:
+            retry_messages = self._context_builder.build(
+                history=self._history,
+                user_message=user_message,
+                memories=self._memory_reader.list(),
+                additional_system_instruction=(
+                    f"{decision_instruction}\n\nSua resposta anterior violou o contrato. "
+                    "Tente uma única vez novamente e devolva somente um dos objetos JSON "
+                    "permitidos, sem texto antes ou depois."
+                ),
+            )
+            decision = parse_conversation_decision(self._model_provider.generate(retry_messages))
         if isinstance(decision, ReplyDecision):
             self._history.append(ConversationTurn(user_message, decision.content))
             self._pending_offer = decision.offer
@@ -91,21 +104,43 @@ class ConversationService:
         original_request: str | None = None,
     ) -> str:
         event_request = original_request or user_message
+        status = event.facts.get("status")
+        requires_status_ack = (
+            event.domain in {"project_tests", "project_lint"}
+            and event.kind == "completed"
+            and isinstance(status, str)
+        )
+        event_instruction = CONVERSATION_EVENT_RESPONSE_INSTRUCTION
+        if requires_status_ack:
+            event_instruction = (
+                f"{event_instruction}\nPara este resultado executável, responda exatamente como: "
+                '{"type":"event_reply","acknowledged_status":"STATUS_EXATO",'
+                '"content":"sua apresentação natural"}. '
+                f'O acknowledged_status deve ser exatamente "{status}".'
+            )
         messages = self._context_builder.build(
             history=self._history,
             user_message=event.to_context_message(event_request),
             memories=self._memory_reader.list(),
-            additional_system_instruction=CONVERSATION_EVENT_RESPONSE_INSTRUCTION,
+            additional_system_instruction=event_instruction,
         )
         response = self._model_provider.generate(messages)
         try:
-            decision = parse_conversation_decision(response)
+            natural_response = _parse_event_response(response, requires_status_ack, status)
         except ConversationDecisionError:
-            natural_response = _parse_event_response_with_optional_preamble(response)
-        else:
-            if not isinstance(decision, ReplyDecision) or decision.offer is not None:
-                raise ConversationDecisionError("conversation event response must be a plain reply")
-            natural_response = decision.content
+            retry_messages = self._context_builder.build(
+                history=self._history,
+                user_message=event.to_context_message(event_request),
+                memories=self._memory_reader.list(),
+                additional_system_instruction=(
+                    f"{event_instruction}\n\nSua resposta anterior violou o contrato de "
+                    "apresentação. Tente uma única vez novamente. Apenas apresente o evento "
+                    "recebido no envelope exigido; não responda ao pedido original como uma "
+                    "nova decisão e não produza capability_proposal."
+                ),
+            )
+            retry_response = self._model_provider.generate(retry_messages)
+            natural_response = _parse_event_response(retry_response, requires_status_ack, status)
         self._history.append(
             ConversationTurn(
                 user_message.strip(),
@@ -115,6 +150,56 @@ class ConversationService:
         )
         self._pending_offer = None
         return natural_response
+
+
+def _parse_event_response(
+    response: str,
+    requires_status_ack: bool,
+    status: object,
+) -> str:
+    if requires_status_ack:
+        if not isinstance(status, str):
+            raise ConversationDecisionError("executable event status must be text")
+        return _parse_status_acknowledged_event(response, status)
+    return _parse_regular_event_response(response)
+
+
+def _parse_regular_event_response(response: str) -> str:
+    try:
+        decision = parse_conversation_decision(response)
+    except ConversationDecisionError:
+        natural_response = _parse_event_response_with_optional_preamble(response)
+    else:
+        if not isinstance(decision, ReplyDecision) or decision.offer is not None:
+            raise ConversationDecisionError("conversation event response must be a plain reply")
+        natural_response = decision.content
+    return natural_response
+
+
+def _parse_status_acknowledged_event(response: str, expected_status: str) -> str:
+    normalized = response.strip()
+    object_start = normalized.find("{")
+    if object_start < 0:
+        raise ConversationDecisionError("executable result response must acknowledge status")
+    try:
+        payload = json.loads(normalized[object_start:])
+    except (json.JSONDecodeError, TypeError) as error:
+        raise ConversationDecisionError("invalid executable result response") from error
+    if not isinstance(payload, dict) or set(payload) != {
+        "type",
+        "acknowledged_status",
+        "content",
+    }:
+        raise ConversationDecisionError("invalid executable result response contract")
+    if (
+        payload.get("type") != "event_reply"
+        or payload.get("acknowledged_status") != expected_status
+    ):
+        raise ConversationDecisionError("executable result response changed authoritative status")
+    content = payload.get("content")
+    if not isinstance(content, str) or not content.strip() or "\0" in content:
+        raise ConversationDecisionError("executable result response content must be valid")
+    return content.strip()
 
 
 def _parse_event_response_with_optional_preamble(response: str) -> str:

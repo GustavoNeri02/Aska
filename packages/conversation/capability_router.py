@@ -10,12 +10,15 @@ CONVERSATION_DECISION_INSTRUCTION = "\n".join(
         '{"type":"reply","content":"sua resposta","offer":{"action":"run_project_tests"}}',
         '{"type":"capability_proposal","action":"open_workspace_location","path":"docs"}',
         '{"type":"capability_proposal","action":"run_project_tests"}',
+        '{"type":"capability_proposal","action":"run_project_lint"}',
         "Capability disponível:",
         "- open_workspace_location: abre uma pasta relativa do workspace no Explorador "
         "de Arquivos. Use path='.' quando o pedido for apenas abrir o Explorador.",
         "- run_project_tests: executa a operação fixa python -m pytest -q na raiz do "
         "workspace e sempre roda a suíte inteira. Não aceita subconjunto, arquivo, nome "
         "de teste, comando, caminho, opção ou argumento do usuário.",
+        "- run_project_lint: executa a operação fixa python -m ruff check . na raiz "
+        "do workspace. Não aceita opções, caminhos ou correção automática.",
         "Entenda paráfrases usando o histórico e as memórias disponíveis.",
         "Escolha capability_proposal somente quando houver um pedido explícito para a "
         "ação acontecer agora. Mencionar uma capability ou perguntar sobre ela não é "
@@ -44,6 +47,8 @@ CONVERSATION_DECISION_INSTRUCTION = "\n".join(
         '"offer":{"action":"run_project_tests"}}',
         'Entrada: rode tests/test_app.py. Saída: {"type":"reply",'
         '"content":"A capability atual não aceita arquivo ou subconjunto de testes."}',
+        'Entrada: rode o Ruff no projeto. Saída: {"type":"capability_proposal",'
+        '"action":"run_project_lint"}',
     )
 )
 
@@ -58,7 +63,14 @@ class RunProjectTestsProposal:
     pass
 
 
-CapabilityProposal = OpenWorkspaceLocationProposal | RunProjectTestsProposal
+@dataclass(frozen=True, slots=True)
+class RunProjectLintProposal:
+    pass
+
+
+CapabilityProposal = (
+    OpenWorkspaceLocationProposal | RunProjectTestsProposal | RunProjectLintProposal
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +125,8 @@ def parse_conversation_decision(response: str) -> ConversationDecision:
         "action": "run_project_tests",
     }:
         return RunProjectTestsProposal()
+    if data == {"type": "capability_proposal", "action": "run_project_lint"}:
+        return RunProjectLintProposal()
     raise ConversationDecisionError("unknown conversation decision")
 
 
@@ -128,6 +142,8 @@ def _validated_reply(value: object) -> str | None:
 def _parse_offer(value: object) -> CapabilityProposal | None:
     if value == {"action": "run_project_tests"}:
         return RunProjectTestsProposal()
+    if value == {"action": "run_project_lint"}:
+        return RunProjectLintProposal()
     if isinstance(value, dict) and set(value) == {"action", "path"}:
         if value.get("action") != "open_workspace_location":
             return None
@@ -139,6 +155,8 @@ def _parse_offer(value: object) -> CapabilityProposal | None:
 def describe_capability_proposal(proposal: CapabilityProposal) -> dict[str, str]:
     if isinstance(proposal, RunProjectTestsProposal):
         return {"action": "run_project_tests"}
+    if isinstance(proposal, RunProjectLintProposal):
+        return {"action": "run_project_lint"}
     if isinstance(proposal, OpenWorkspaceLocationProposal):
         return {"action": "open_workspace_location", "path": proposal.path}
     raise TypeError("unknown capability proposal")

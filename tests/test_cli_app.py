@@ -12,7 +12,7 @@ from capabilities.filesystem import (
     ReadTextFileCapability,
     SearchTextCapability,
 )
-from capabilities.terminal import RunProjectTestsCapability
+from capabilities.terminal import RunProjectLintCapability, RunProjectTestsCapability
 from packages.conversation import ModelProviderError
 
 
@@ -128,6 +128,7 @@ def test_main_configures_file_reader_with_allowed_workspace(
         OpenWorkspaceLocationCapability,
     )
     assert isinstance(configured["project_tests_capability"], RunProjectTestsCapability)
+    assert isinstance(configured["project_lint_capability"], RunProjectLintCapability)
     assert isinstance(
         configured["confirmation_interpreter"],
         ModelConfirmationInterpreter,

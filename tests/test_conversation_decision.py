@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -6,12 +7,24 @@ from packages.conversation import (
     ConversationDecisionError,
     ConversationEvent,
     ConversationService,
+    ModelMessage,
     ModelRole,
     OpenWorkspaceLocationProposal,
     ReplyDecision,
+    RunProjectLintProposal,
     RunProjectTestsProposal,
 )
 from tests.cli_support import FakeProvider, create_temp_memory_service
+
+
+class SequencedProvider:
+    def __init__(self, responses: list[str]) -> None:
+        self._responses = iter(responses)
+        self.messages: list[list[ModelMessage]] = []
+
+    def generate(self, messages: Sequence[ModelMessage]) -> str:
+        self.messages.append(list(messages))
+        return next(self._responses)
 
 
 def test_decide_returns_reply_and_records_clean_conversation_history(
@@ -32,6 +45,22 @@ def test_decide_returns_reply_and_records_clean_conversation_history(
     assert "rode o primeiro teste do projeto" in provider.messages[0][0].content
     assert "só pode executar a suíte inteira" in provider.messages[0][0].content
     assert provider.messages[0][-1].content == "Como você está?"
+
+
+def test_decide_retries_invalid_contract_once(tmp_path: Path) -> None:
+    provider = SequencedProvider(
+        [
+            "resposta livre inválida",
+            '{"type":"reply","content":"O Ruff retornou All checks passed."}',
+        ]
+    )
+    service = ConversationService(provider, create_temp_memory_service(tmp_path))
+
+    decision = service.decide("O que ele retornou?")
+
+    assert decision == ReplyDecision("O Ruff retornou All checks passed.")
+    assert len(provider.messages) == 2
+    assert "resposta anterior violou o contrato" in provider.messages[1][0].content
 
 
 def test_decide_returns_proposal_without_recording_execution_as_history(
@@ -59,6 +88,14 @@ def test_decide_returns_fixed_project_tests_proposal(tmp_path: Path) -> None:
     assert service.history == []
 
 
+def test_decide_returns_fixed_project_lint_proposal(tmp_path: Path) -> None:
+    provider = FakeProvider('{"type":"capability_proposal","action":"run_project_lint"}')
+    service = ConversationService(provider, create_temp_memory_service(tmp_path))
+
+    assert service.decide("Rode o Ruff no projeto.") == RunProjectLintProposal()
+    assert service.history == []
+
+
 def test_reply_can_keep_a_typed_offer_for_the_next_turn(tmp_path: Path) -> None:
     provider = FakeProvider(
         '{"type":"reply","content":"Posso executar a suíte inteira.",'
@@ -79,7 +116,10 @@ def test_reply_can_keep_a_typed_offer_for_the_next_turn(tmp_path: Path) -> None:
 def test_external_event_is_presented_by_model_and_recorded_as_aska_reply(
     tmp_path: Path,
 ) -> None:
-    provider = FakeProvider('{"type":"reply","content":"Tudo certo: os 507 testes passaram."}')
+    provider = FakeProvider(
+        '{"type":"event_reply","acknowledged_status":"success",'
+        '"content":"Tudo certo: os 507 testes passaram."}'
+    )
     service = ConversationService(provider, create_temp_memory_service(tmp_path))
 
     response = service.present_event(
@@ -87,7 +127,7 @@ def test_external_event_is_presented_by_model_and_recorded_as_aska_reply(
         ConversationEvent(
             domain="project_tests",
             kind="completed",
-            facts={"exit_code": 0, "stdout": "507 passed", "stderr": ""},
+            facts={"status": "success", "exit_code": 0, "stdout": "507 passed", "stderr": ""},
         ),
     )
 
@@ -95,6 +135,25 @@ def test_external_event_is_presented_by_model_and_recorded_as_aska_reply(
     assert service.history[0].assistant_message == response
     assert "evento local autoritativo" in provider.messages[0][0].content
     assert '"exit_code": 0' in provider.messages[0][-1].content
+
+
+def test_executable_event_rejects_model_that_changes_status(tmp_path: Path) -> None:
+    provider = FakeProvider(
+        '{"type":"event_reply","acknowledged_status":"success","content":"O Ruff passou."}'
+    )
+    service = ConversationService(provider, create_temp_memory_service(tmp_path))
+
+    with pytest.raises(ConversationDecisionError, match="authoritative status"):
+        service.present_event(
+            "rode o Ruff",
+            ConversationEvent(
+                "project_lint",
+                "completed",
+                {"status": "issues_found", "exit_code": 1, "stdout": "E501"},
+            ),
+        )
+
+    assert service.history == []
 
 
 def test_external_event_discards_text_before_valid_reply_envelope(tmp_path: Path) -> None:
@@ -115,6 +174,32 @@ def test_external_event_discards_text_before_valid_reply_envelope(tmp_path: Path
 
     assert response == "Por favor, confirme digitando sim."
     assert '{"type"' not in response
+
+
+def test_external_event_retries_capability_proposal_instead_of_exposing_error(
+    tmp_path: Path,
+) -> None:
+    provider = SequencedProvider(
+        [
+            '{"type":"capability_proposal","action":"run_project_lint"}',
+            '{"type":"reply","content":"Posso rodar o Ruff. Você confirma?"}',
+        ]
+    )
+    service = ConversationService(provider, create_temp_memory_service(tmp_path))
+
+    response = service.present_event(
+        "rode o Ruff no projeto",
+        ConversationEvent(
+            "project_lint",
+            "confirmation_required",
+            {"command": ["python", "-m", "ruff", "check", "."]},
+        ),
+    )
+
+    assert response == "Posso rodar o Ruff. Você confirma?"
+    assert len(provider.messages) == 2
+    assert "não produza capability_proposal" in provider.messages[1][0].content
+    assert len(service.history) == 1
 
 
 def test_decide_receives_existing_history_and_memories(tmp_path: Path) -> None:

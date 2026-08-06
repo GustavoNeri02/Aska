@@ -1,7 +1,13 @@
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Protocol
+
+from capabilities.terminal.process import (
+    FixedProcessError,
+    FixedProcessResult,
+    FixedProcessRunner,
+    FixedProcessTimeoutError,
+)
 
 PROJECT_TEST_COMMAND = ("python", "-m", "pytest", "-q")
 
@@ -13,23 +19,10 @@ class ProjectTestTarget:
     inode: int
 
 
-@dataclass(frozen=True, slots=True)
-class ProjectTestProcessResult:
-    exit_code: int
-    stdout: str
-    stderr: str
-
-
-class ProjectTestRunnerError(RuntimeError):
-    """Raised when the fixed project-test process cannot be started."""
-
-
-class ProjectTestTimeoutError(RuntimeError):
-    """Raised when the fixed project-test process exceeds its timeout."""
-
-
-class ProjectTestRunner(Protocol):
-    def run(self, workspace_root: Path, timeout_seconds: float) -> ProjectTestProcessResult: ...
+ProjectTestProcessResult = FixedProcessResult
+ProjectTestRunnerError = FixedProcessError
+ProjectTestTimeoutError = FixedProcessTimeoutError
+ProjectTestRunner = FixedProcessRunner
 
 
 class RunProjectTestsStatus(StrEnum):

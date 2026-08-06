@@ -4,6 +4,7 @@ from packages.conversation.capability_router import (
     ConversationDecisionError,
     OpenWorkspaceLocationProposal,
     ReplyDecision,
+    RunProjectLintProposal,
     RunProjectTestsProposal,
 )
 from packages.conversation.context import ContextBuilder
@@ -56,6 +57,7 @@ from packages.conversation.natural_search import (
     detect_explicit_text_search,
     should_interpret_text_search,
 )
+from packages.conversation.natural_terminal import detect_explicit_project_lint
 from packages.conversation.provider import ModelProvider, ModelProviderError
 from packages.conversation.service import ConversationService
 
@@ -91,6 +93,7 @@ __all__ = [
     "PendingMemoryEdit",
     "ReplyDecision",
     "RunProjectTestsProposal",
+    "RunProjectLintProposal",
     "ReadTextFileIntent",
     "SearchTextIntent",
     "TextSearchIntentInterpreter",
@@ -102,6 +105,7 @@ __all__ = [
     "detect_explicit_file_read",
     "detect_explicit_file_location",
     "detect_explicit_open_location",
+    "detect_explicit_project_lint",
     "detect_known_document_query",
     "find_name_memory_candidates",
     "should_interpret_memory_add",

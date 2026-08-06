@@ -12,6 +12,7 @@ from apps.cli.handlers import (
     NaturalFileSearchHandler,
     NaturalMemoryHandler,
     NaturalOpenLocationHandler,
+    NaturalProjectLintHandler,
     NaturalProjectTestsHandler,
     handle_memory_command,
 )
@@ -22,7 +23,12 @@ from capabilities.filesystem import (
     ReadTextFileCapability,
     SearchTextCapability,
 )
-from capabilities.terminal import PythonProjectTestRunner, RunProjectTestsCapability
+from capabilities.terminal import (
+    PythonModuleRunner,
+    PythonProjectTestRunner,
+    RunProjectLintCapability,
+    RunProjectTestsCapability,
+)
 from packages.conversation import (
     ConversationDecisionError,
     ConversationEvent,
@@ -36,8 +42,10 @@ from packages.conversation import (
     ModelTextSearchIntentInterpreter,
     OpenWorkspaceLocationProposal,
     ReplyDecision,
+    RunProjectLintProposal,
     RunProjectTestsProposal,
     TextSearchIntentInterpreter,
+    detect_explicit_project_lint,
 )
 from packages.inference import OllamaProvider
 from packages.memory import (
@@ -68,6 +76,7 @@ def run_conversation_loop(
     text_search_intent_interpreter: TextSearchIntentInterpreter | None = None,
     open_location_capability: OpenWorkspaceLocationCapability | None = None,
     project_tests_capability: RunProjectTestsCapability | None = None,
+    project_lint_capability: RunProjectLintCapability | None = None,
     confirmation_interpreter: ConfirmationInterpreter | None = None,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
@@ -114,6 +123,11 @@ def run_conversation_loop(
         if project_tests_capability is not None
         else None
     )
+    natural_project_lint_handler = (
+        NaturalProjectLintHandler(project_lint_capability, confirmation_interpreter)
+        if project_lint_capability is not None
+        else None
+    )
 
     while True:
         try:
@@ -143,6 +157,8 @@ def run_conversation_loop(
                     natural_open_location_handler.cancel_pending_for_literal_command()
                 if natural_project_tests_handler is not None:
                     natural_project_tests_handler.cancel_pending_for_literal_command()
+                if natural_project_lint_handler is not None:
+                    natural_project_lint_handler.cancel_pending_for_literal_command()
                 handler_result = handle_memory_command(parsed_input, memory_service)
                 if cancelled is not None:
                     handler_result = HandlerResult(
@@ -206,6 +222,20 @@ def run_conversation_loop(
                     )
                     continue
                 if (
+                    natural_project_lint_handler is not None
+                    and (
+                        handler_result := natural_project_lint_handler.handle(parsed_input.content)
+                    )
+                    is not None
+                ):
+                    _render_handler_result(
+                        handler_result,
+                        parsed_input.content,
+                        conversation_service,
+                        output_writer,
+                    )
+                    continue
+                if (
                     natural_project_tests_handler is not None
                     and (
                         handler_result := natural_project_tests_handler.handle(parsed_input.content)
@@ -219,9 +249,25 @@ def run_conversation_loop(
                         output_writer,
                     )
                     continue
+                explicit_lint = detect_explicit_project_lint(parsed_input.content)
+                if explicit_lint is not None:
+                    if natural_project_lint_handler is not None:
+                        handler_result = natural_project_lint_handler.handle_proposal(
+                            explicit_lint, parsed_input.content
+                        )
+                    else:
+                        handler_result = HandlerResult("project_lint", "unavailable")
+                    _render_handler_result(
+                        handler_result,
+                        parsed_input.content,
+                        conversation_service,
+                        output_writer,
+                    )
+                    continue
                 if (
                     natural_open_location_handler is not None
                     or natural_project_tests_handler is not None
+                    or natural_project_lint_handler is not None
                 ):
                     decision = conversation_service.decide(parsed_input.content)
                     if isinstance(decision, ReplyDecision):
@@ -260,6 +306,24 @@ def run_conversation_loop(
                         else:
                             _render_handler_result(
                                 HandlerResult("project_tests", "unavailable"),
+                                parsed_input.content,
+                                conversation_service,
+                                output_writer,
+                            )
+                    elif isinstance(decision, RunProjectLintProposal):
+                        if natural_project_lint_handler is not None:
+                            handler_result = natural_project_lint_handler.handle_proposal(
+                                decision, parsed_input.content
+                            )
+                            _render_handler_result(
+                                handler_result,
+                                parsed_input.content,
+                                conversation_service,
+                                output_writer,
+                            )
+                        else:
+                            _render_handler_result(
+                                HandlerResult("project_lint", "unavailable"),
                                 parsed_input.content,
                                 conversation_service,
                                 output_writer,
@@ -317,6 +381,13 @@ def main() -> None:
         )
     except ValueError:
         project_tests_capability = None
+    try:
+        project_lint_capability = RunProjectLintCapability(
+            workspace_root,
+            PythonModuleRunner("ruff", ("check", ".")),
+        )
+    except ValueError:
+        project_lint_capability = None
 
     model = os.getenv("ASKA_MODEL", "gemma3:12b")
     model_provider = OllamaProvider(
@@ -348,6 +419,7 @@ def main() -> None:
             text_search_intent_interpreter=text_search_intent_interpreter,
             open_location_capability=open_location_capability,
             project_tests_capability=project_tests_capability,
+            project_lint_capability=project_lint_capability,
             confirmation_interpreter=confirmation_interpreter,
         )
     finally:
