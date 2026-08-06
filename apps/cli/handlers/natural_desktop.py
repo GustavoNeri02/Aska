@@ -8,9 +8,7 @@ from capabilities.desktop import (
     WorkspaceLocationTarget,
 )
 from packages.conversation import (
-    CapabilityProposalRouter,
     OpenWorkspaceLocationProposal,
-    ProposalRouteStatus,
     detect_explicit_open_location,
 )
 
@@ -19,11 +17,9 @@ class NaturalOpenLocationHandler:
     def __init__(
         self,
         capability: OpenWorkspaceLocationCapability,
-        proposal_router: CapabilityProposalRouter,
         output_writer: Callable[[str], None],
     ) -> None:
         self._capability = capability
-        self._proposal_router = proposal_router
         self._output_writer = output_writer
         self._pending: WorkspaceLocationTarget | None = None
 
@@ -33,21 +29,10 @@ class NaturalOpenLocationHandler:
 
         proposal = detect_explicit_open_location(user_input)
         if proposal is None:
-            route = self._proposal_router.route(user_input)
-            if route.status is ProposalRouteStatus.NONE:
-                return False
-            if route.status is ProposalRouteStatus.INVALID_RESPONSE:
-                self._output_writer(
-                    "Não foi possível interpretar uma proposta de ação com segurança."
-                )
-                return True
-            proposal = route.proposal
-        if not isinstance(proposal, OpenWorkspaceLocationProposal):
-            self._output_writer(
-                "A proposta não corresponde a uma capability disponível."
-            )
-            return True
+            return False
+        return self.handle_proposal(proposal)
 
+    def handle_proposal(self, proposal: OpenWorkspaceLocationProposal) -> bool:
         result = self._capability.prepare(proposal.path)
         if result.status is not ResolveLocationStatus.SUCCESS:
             self._output_writer(_resolve_error_message(result.status))

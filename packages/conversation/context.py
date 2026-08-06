@@ -17,6 +17,7 @@ class ContextBuilder:
         user_message: str,
         memories: Sequence[Memory],
         context_document: ContextDocument | None = None,
+        additional_system_instruction: str | None = None,
     ) -> list[ModelMessage]:
         system_content = ASKA_IDENTITY
 
@@ -25,6 +26,9 @@ class ContextBuilder:
                 ["Memórias sobre Gustavo:", *(f"- {memory.content}" for memory in memories)]
             )
             system_content = f"{system_content}\n\n{memory_context}"
+
+        if additional_system_instruction is not None:
+            system_content = f"{system_content}\n\n{additional_system_instruction}"
 
         messages = [ModelMessage(ModelRole.SYSTEM, system_content)]
         for turn in history:

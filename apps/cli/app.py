@@ -20,16 +20,17 @@ from capabilities.filesystem import (
     SearchTextCapability,
 )
 from packages.conversation import (
-    CapabilityProposalRouter,
+    ConversationDecisionError,
     ConversationService,
     FileIntentInterpreter,
     MemoryIntentInterpreter,
-    ModelCapabilityProposalRouter,
     ModelFileIntentInterpreter,
     ModelMemoryIntentInterpreter,
     ModelProvider,
     ModelProviderError,
     ModelTextSearchIntentInterpreter,
+    OpenWorkspaceLocationProposal,
+    ReplyDecision,
     TextSearchIntentInterpreter,
 )
 from packages.inference import OllamaProvider
@@ -60,7 +61,6 @@ def run_conversation_loop(
     file_searcher: SearchTextCapability | None = None,
     text_search_intent_interpreter: TextSearchIntentInterpreter | None = None,
     open_location_capability: OpenWorkspaceLocationCapability | None = None,
-    capability_proposal_router: CapabilityProposalRouter | None = None,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
 ) -> None:
@@ -100,11 +100,9 @@ def run_conversation_loop(
     natural_open_location_handler = (
         NaturalOpenLocationHandler(
             open_location_capability,
-            capability_proposal_router,
             output_writer,
         )
         if open_location_capability is not None
-        and capability_proposal_router is not None
         else None
     )
 
@@ -147,12 +145,23 @@ def run_conversation_loop(
                     natural_open_location_handler.handle(parsed_input.content)
                 ):
                     continue
+                if natural_open_location_handler is not None:
+                    decision = conversation_service.decide(parsed_input.content)
+                    if isinstance(decision, ReplyDecision):
+                        output_writer(f"Aska > {decision.content}")
+                    elif isinstance(decision, OpenWorkspaceLocationProposal):
+                        natural_open_location_handler.handle_proposal(decision)
+                    continue
                 response = conversation_service.send(parsed_input.content)
                 output_writer(f"Aska > {response}")
         except MemoryRepositoryError as error:
             output_writer(f"Não foi possível acessar as memórias: {error}")
         except ModelProviderError as error:
             output_writer(f"Aska > {error}")
+        except ConversationDecisionError:
+            output_writer(
+                "Aska > Não foi possível interpretar a resposta do modelo com segurança."
+            )
 
 
 def main() -> None:
@@ -185,7 +194,6 @@ def main() -> None:
     memory_intent_interpreter = ModelMemoryIntentInterpreter(model_provider)
     file_intent_interpreter = ModelFileIntentInterpreter(model_provider)
     text_search_intent_interpreter = ModelTextSearchIntentInterpreter(model_provider)
-    capability_proposal_router = ModelCapabilityProposalRouter(model_provider)
 
     try:
         try:
@@ -203,7 +211,6 @@ def main() -> None:
             file_searcher=file_searcher,
             text_search_intent_interpreter=text_search_intent_interpreter,
             open_location_capability=open_location_capability,
-            capability_proposal_router=capability_proposal_router,
         )
     finally:
         with suppress(ModelProviderError):

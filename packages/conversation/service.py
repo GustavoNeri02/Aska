@@ -1,5 +1,11 @@
 from typing import Protocol
 
+from packages.conversation.capability_router import (
+    CONVERSATION_DECISION_INSTRUCTION,
+    ConversationDecision,
+    ReplyDecision,
+    parse_conversation_decision,
+)
 from packages.conversation.context import ContextBuilder
 from packages.conversation.model import ContextDocument, ConversationTurn
 from packages.conversation.provider import ModelProvider
@@ -40,3 +46,16 @@ class ConversationService:
         response = self._model_provider.generate(messages)
         self._history.append(ConversationTurn(user_message, response))
         return response
+
+    def decide(self, user_message: str) -> ConversationDecision:
+        messages = self._context_builder.build(
+            history=self._history,
+            user_message=user_message,
+            memories=self._memory_reader.list(),
+            additional_system_instruction=CONVERSATION_DECISION_INSTRUCTION,
+        )
+        response = self._model_provider.generate(messages)
+        decision = parse_conversation_decision(response)
+        if isinstance(decision, ReplyDecision):
+            self._history.append(ConversationTurn(user_message, decision.content))
+        return decision

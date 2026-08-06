@@ -1,10 +1,9 @@
 from packages.conversation.capability_router import (
     CapabilityProposal,
-    CapabilityProposalRouter,
-    ModelCapabilityProposalRouter,
+    ConversationDecision,
+    ConversationDecisionError,
     OpenWorkspaceLocationProposal,
-    ProposalRouteResult,
-    ProposalRouteStatus,
+    ReplyDecision,
 )
 from packages.conversation.context import ContextBuilder
 from packages.conversation.identity import ASKA_IDENTITY
@@ -61,7 +60,8 @@ from packages.conversation.service import ConversationService
 __all__ = [
     "ASKA_IDENTITY",
     "CapabilityProposal",
-    "CapabilityProposalRouter",
+    "ConversationDecision",
+    "ConversationDecisionError",
     "AddMemoryIntent",
     "DeleteMemoryIntent",
     "EditMemoryIntent",
@@ -79,7 +79,6 @@ __all__ = [
     "MemoryIntent",
     "MemoryIntentInterpreter",
     "ModelMemoryIntentInterpreter",
-    "ModelCapabilityProposalRouter",
     "ModelTextSearchIntentInterpreter",
     "ModelFileIntentInterpreter",
     "NameUpdateIntent",
@@ -87,8 +86,7 @@ __all__ = [
     "PendingMemoryAdd",
     "PendingMemoryDelete",
     "PendingMemoryEdit",
-    "ProposalRouteResult",
-    "ProposalRouteStatus",
+    "ReplyDecision",
     "ReadTextFileIntent",
     "SearchTextIntent",
     "TextSearchIntentInterpreter",

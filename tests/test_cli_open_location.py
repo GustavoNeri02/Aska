@@ -5,8 +5,6 @@ from apps.cli.handlers import NaturalOpenLocationHandler
 from capabilities.desktop import OpenWorkspaceLocationCapability
 from packages.conversation import (
     OpenWorkspaceLocationProposal,
-    ProposalRouteResult,
-    ProposalRouteStatus,
 )
 from tests.cli_support import FakeProvider, create_input_reader, create_temp_memory_service
 
@@ -19,25 +17,13 @@ class RecordingLauncher:
         self.paths.append(path)
 
 
-class StaticRouter:
-    def __init__(self, result: ProposalRouteResult | None = None) -> None:
-        self.result = result or ProposalRouteResult(ProposalRouteStatus.NONE)
-        self.inputs: list[str] = []
-
-    def route(self, user_input: str) -> ProposalRouteResult:
-        self.inputs.append(user_input)
-        return self.result
-
-
 def _create_handler(
     workspace: Path,
-    router: StaticRouter | None = None,
 ) -> tuple[NaturalOpenLocationHandler, RecordingLauncher, list[str]]:
     launcher = RecordingLauncher()
     output: list[str] = []
     handler = NaturalOpenLocationHandler(
         OpenWorkspaceLocationCapability(workspace.resolve(), launcher),
-        router or StaticRouter(),
         output.append,
     )
     return handler, launcher, output
@@ -127,53 +113,29 @@ def test_outside_workspace_is_rejected_without_launch(tmp_path: Path) -> None:
 
 
 def test_absolute_explorer_target_is_rejected_locally(tmp_path: Path) -> None:
-    router = StaticRouter()
-    handler, launcher, output = _create_handler(tmp_path, router)
+    handler, launcher, output = _create_handler(tmp_path)
 
     assert handler.handle("abra o explorer em c:/") is True
 
-    assert router.inputs == []
     assert launcher.paths == []
     assert output[-1].startswith("Acesso negado")
 
 
-def test_clear_desktop_request_does_not_fall_through_when_interpretation_fails(
-    tmp_path: Path,
-) -> None:
-    router = StaticRouter(ProposalRouteResult(ProposalRouteStatus.INVALID_RESPONSE))
-    handler, launcher, output = _create_handler(tmp_path, router)
-
-    assert handler.handle("Inicia o Explorer de um jeito diferente.") is True
-
-    assert router.inputs == ["Inicia o Explorer de um jeito diferente."]
-    assert launcher.paths == []
-    assert output[-1] == "Não foi possível interpretar uma proposta de ação com segurança."
-
-
-def test_natural_request_uses_capability_router(tmp_path: Path) -> None:
+def test_typed_natural_proposal_is_prepared_by_handler(tmp_path: Path) -> None:
     docs = tmp_path / "docs"
     docs.mkdir()
-    router = StaticRouter(
-        ProposalRouteResult(
-            ProposalRouteStatus.PROPOSAL,
-            OpenWorkspaceLocationProposal("docs"),
-        )
-    )
-    handler, launcher, _ = _create_handler(tmp_path, router)
+    handler, launcher, _ = _create_handler(tmp_path)
 
-    assert handler.handle("Mostre a pasta de documentação no Explorer.") is True
+    assert handler.handle_proposal(OpenWorkspaceLocationProposal("docs")) is True
 
-    assert router.inputs == ["Mostre a pasta de documentação no Explorer."]
     assert launcher.paths == []
 
 
-def test_router_can_leave_unrelated_message_for_conversation(tmp_path: Path) -> None:
-    router = StaticRouter()
-    handler, launcher, output = _create_handler(tmp_path, router)
+def test_non_exact_message_is_left_for_conversation_decision(tmp_path: Path) -> None:
+    handler, launcher, output = _create_handler(tmp_path)
 
     assert handler.handle("Onde fica a pasta docs?") is False
 
-    assert router.inputs == ["Onde fica a pasta docs?"]
     assert launcher.paths == []
     assert output == []
 
@@ -191,7 +153,6 @@ def test_conversation_loop_routes_open_proposal_and_confirmation(tmp_path: Path)
         open_location_capability=OpenWorkspaceLocationCapability(
             tmp_path.resolve(), launcher
         ),
-        capability_proposal_router=StaticRouter(),
         input_reader=create_input_reader(
             ["Abra a pasta docs no Explorador.", "sim", "sair"]
         ),
@@ -201,3 +162,74 @@ def test_conversation_loop_routes_open_proposal_and_confirmation(tmp_path: Path)
     assert launcher.paths == [docs.resolve()]
     assert provider.messages == []
     assert "Pasta aberta no Explorador de Arquivos." in output
+
+
+def test_conversation_loop_uses_one_model_call_for_semantic_proposal(
+    tmp_path: Path,
+) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    launcher = RecordingLauncher()
+    provider = FakeProvider(
+        '{"type":"capability_proposal",'
+        '"action":"open_workspace_location","path":"docs"}'
+    )
+    output: list[str] = []
+
+    run_conversation_loop(
+        provider,
+        create_temp_memory_service(tmp_path),
+        open_location_capability=OpenWorkspaceLocationCapability(
+            tmp_path.resolve(), launcher
+        ),
+        input_reader=create_input_reader(
+            ["Queria ver a documentação numa janela.", "sim", "sair"]
+        ),
+        output_writer=output.append,
+    )
+
+    assert len(provider.messages) == 1
+    assert launcher.paths == [docs.resolve()]
+
+
+def test_conversation_loop_uses_same_decision_call_for_normal_reply(
+    tmp_path: Path,
+) -> None:
+    launcher = RecordingLauncher()
+    provider = FakeProvider('{"type":"reply","content":"Olá por aqui."}')
+    output: list[str] = []
+
+    run_conversation_loop(
+        provider,
+        create_temp_memory_service(tmp_path),
+        open_location_capability=OpenWorkspaceLocationCapability(
+            tmp_path.resolve(), launcher
+        ),
+        input_reader=create_input_reader(["Como você está?", "sair"]),
+        output_writer=output.append,
+    )
+
+    assert len(provider.messages) == 1
+    assert launcher.paths == []
+    assert "Aska > Olá por aqui." in output
+
+
+def test_invalid_decision_envelope_is_reported_without_execution(tmp_path: Path) -> None:
+    launcher = RecordingLauncher()
+    output: list[str] = []
+
+    run_conversation_loop(
+        FakeProvider("resposta fora do envelope"),
+        create_temp_memory_service(tmp_path),
+        open_location_capability=OpenWorkspaceLocationCapability(
+            tmp_path.resolve(), launcher
+        ),
+        input_reader=create_input_reader(["pedido", "sair"]),
+        output_writer=output.append,
+    )
+
+    assert launcher.paths == []
+    assert (
+        "Aska > Não foi possível interpretar a resposta do modelo com segurança."
+        in output
+    )
