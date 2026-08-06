@@ -146,7 +146,9 @@ class ListFilesCapability:
                         )
                     paths.append(entry.relative_to(self._workspace_root).as_posix())
             except OSError:
-                return ListFilesResult(ListFilesStatus.READ_FAILED)
+                if depth == 0:
+                    return ListFilesResult(ListFilesStatus.READ_FAILED)
+                continue
 
         return ListFilesResult(ListFilesStatus.SUCCESS, tuple(paths))
 

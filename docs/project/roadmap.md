@@ -44,7 +44,7 @@
 
 ### Incremento atual da Fase 4
 
-O recorte read-only atual de Tools and capabilities está `implemented`: `ReadTextFileCapability` lê um arquivo textual conhecido, e `ListFilesCapability` descobre caminhos relativos sem ler conteúdo. Ambas aplicam confinamento local ao workspace e retornam resultados tipados; a listagem também limita profundidade e resultados e ignora diretórios de infraestrutura conhecidos. `NaturalFileReadHandler` fornece o conteúdo ou a listagem em uma mensagem `user` separada somente à resposta atual. Não há tool calling, execução arbitrária, escrita, leitura automática de múltiplos arquivos, busca pelo conteúdo, registry ou manifesto genérico de capabilities; esses recursos continuam `planned` quando aplicável.
+O recorte read-only atual de Tools and capabilities está `implemented`: `ReadTextFileCapability` lê um arquivo textual conhecido, e `ListFilesCapability` descobre caminhos relativos sem ler conteúdo. Ambas aplicam confinamento local ao workspace e retornam resultados tipados; a listagem também limita profundidade e resultados e ignora diretórios de infraestrutura conhecidos. Quando um pedido de leitura informa somente o nome de um arquivo ausente na raiz, `NaturalFileReadHandler` usa a listagem segura para resolver uma única correspondência exata ou solicita o caminho relativo diante de ambiguidade. O conteúdo ou a listagem é fornecido em uma mensagem `user` separada somente à resposta atual. Não há tool calling, execução arbitrária, escrita, leitura automática de múltiplos arquivos, busca pelo conteúdo, registry ou manifesto genérico de capabilities; esses recursos continuam `planned` quando aplicável.
 
 ### Escopo concluído da Fase 3
 

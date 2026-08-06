@@ -178,3 +178,29 @@ def test_capability_returns_typed_read_failure(
     result = ListFilesCapability(workspace).list()
 
     assert result.status is ListFilesStatus.READ_FAILED
+
+
+def test_capability_skips_inaccessible_nested_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = (tmp_path / "workspace").resolve()
+    workspace.mkdir()
+    inaccessible = workspace / "inaccessible"
+    inaccessible.mkdir()
+    docs = workspace / "docs"
+    docs.mkdir()
+    (docs / "vision.md").write_text("vision", encoding="utf-8")
+    real_iterdir = Path.iterdir
+
+    def fail_nested_iteration(path: Path):
+        if path == inaccessible:
+            raise PermissionError("access denied")
+        return real_iterdir(path)
+
+    monkeypatch.setattr(Path, "iterdir", fail_nested_iteration)
+
+    result = ListFilesCapability(workspace).list(name_contains="vision.md")
+
+    assert result.status is ListFilesStatus.SUCCESS
+    assert result.paths == ("docs/vision.md",)

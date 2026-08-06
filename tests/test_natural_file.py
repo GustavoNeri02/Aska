@@ -32,6 +32,9 @@ class StaticProvider:
         "Consulte pyproject.toml para responder.",
         "Quero consultar docs/README.md.",
         "Veja o arquivo AGENTS.md.",
+        "Resuma docs/product/vision.md.",
+        "Mostre o conteúdo de docs/project/roadmap.md.",
+        r"Retorne exatamente o que está em D:\Projetos\Aska\README.md.",
     ],
 )
 def test_file_read_gate_accepts_explicit_requests(message: str) -> None:
@@ -57,6 +60,12 @@ def test_file_gate_accepts_listing_requests(message: str) -> None:
         ("Leia docs/project/roadmap.md", "docs/project/roadmap.md"),
         ("Abra o arquivo AGENTS.md e resuma.", "AGENTS.md"),
         ("CONSULTE pyproject.toml.", "pyproject.toml"),
+        ("Resuma docs/product/vision.md", "docs/product/vision.md"),
+        ("Mostre o conteúdo de docs/project/roadmap.md", "docs/project/roadmap.md"),
+        (
+            r"Retorne exatamente o que está em D:\Projetos\Aska\docs\README.md",
+            r"D:\Projetos\Aska\docs\README.md",
+        ),
     ],
 )
 def test_explicit_file_path_is_extracted_deterministically(

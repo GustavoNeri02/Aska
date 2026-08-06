@@ -41,6 +41,100 @@ def test_file_request_adds_temporary_context_without_contaminating_next_request(
     assert create_memory_service(tmp_path / "memories.json").list() == []
 
 
+def test_natural_summary_with_relative_path_reads_file_deterministically(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    document = workspace / "docs" / "product" / "vision.md"
+    document.parent.mkdir(parents=True)
+    document.write_text("Visão real do produto.", encoding="utf-8")
+    provider = FakeProvider()
+    interpreter = FakeFileIntentInterpreter(None)
+
+    run_conversation_loop(
+        provider,
+        memory_service=create_memory_service(tmp_path / "memories.json"),
+        file_reader=ReadTextFileCapability(workspace.resolve()),
+        file_intent_interpreter=interpreter,
+        input_reader=create_input_reader([r"Resuma docs\product\vision.md", "sair"]),
+        output_writer=lambda message: None,
+    )
+
+    assert interpreter.inputs == []
+    assert "Visão real do produto." in provider.messages[0][-2].content
+
+
+def test_bare_filename_is_discovered_and_read_when_match_is_unique(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    document = workspace / "docs" / "product" / "vision.md"
+    document.parent.mkdir(parents=True)
+    document.write_text("Visão encontrada pelo nome.", encoding="utf-8")
+    provider = FakeProvider()
+
+    run_conversation_loop(
+        provider,
+        memory_service=create_memory_service(tmp_path / "memories.json"),
+        file_reader=ReadTextFileCapability(workspace.resolve()),
+        file_lister=ListFilesCapability(workspace.resolve()),
+        file_intent_interpreter=FakeFileIntentInterpreter(None),
+        input_reader=create_input_reader(["Resuma vision.md", "sair"]),
+        output_writer=lambda message: None,
+    )
+
+    assert "Fonte: docs/product/vision.md" in provider.messages[0][-2].content
+    assert "Visão encontrada pelo nome." in provider.messages[0][-2].content
+
+
+def test_bare_filename_with_multiple_matches_requests_relative_path(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    for directory in (workspace / "docs", workspace / "notes"):
+        directory.mkdir(parents=True)
+        (directory / "vision.md").write_text("conteúdo", encoding="utf-8")
+    provider = FakeProvider()
+    output: list[str] = []
+
+    run_conversation_loop(
+        provider,
+        memory_service=create_memory_service(tmp_path / "memories.json"),
+        file_reader=ReadTextFileCapability(workspace.resolve()),
+        file_lister=ListFilesCapability(workspace.resolve()),
+        file_intent_interpreter=FakeFileIntentInterpreter(None),
+        input_reader=create_input_reader(["Resuma vision.md", "sair"]),
+        output_writer=output.append,
+    )
+
+    assert provider.messages == []
+    assert (
+        "Não foi possível escolher um único arquivo. Informe o caminho relativo:\n"
+        "- docs/vision.md\n"
+        "- notes/vision.md"
+    ) in output
+
+
+def test_absolute_file_path_is_consumed_with_local_guidance(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    provider = FakeProvider()
+    output: list[str] = []
+
+    run_conversation_loop(
+        provider,
+        memory_service=create_memory_service(tmp_path / "memories.json"),
+        file_reader=ReadTextFileCapability(workspace.resolve()),
+        file_intent_interpreter=FakeFileIntentInterpreter(None),
+        input_reader=create_input_reader(
+            [r"Retorne exatamente o que está em D:\Projetos\Aska\README.md", "sair"]
+        ),
+        output_writer=output.append,
+    )
+
+    assert provider.messages == []
+    assert (
+        "Acesso negado: o arquivo deve estar dentro do workspace permitido. "
+        "Use um caminho relativo ao workspace."
+    ) in output
+
+
 def test_file_request_outside_workspace_is_consumed_without_model_response(
     tmp_path: Path,
 ) -> None:
@@ -60,7 +154,10 @@ def test_file_request_outside_workspace_is_consumed_without_model_response(
     )
 
     assert provider.messages == []
-    assert "Acesso negado: o arquivo deve estar dentro do workspace permitido." in output
+    assert (
+        "Acesso negado: o arquivo deve estar dentro do workspace permitido. "
+        "Use um caminho relativo ao workspace."
+    ) in output
 
 
 def test_file_read_error_is_consumed_without_conversational_provider(

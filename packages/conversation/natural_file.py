@@ -7,7 +7,8 @@ from packages.conversation.model import ModelMessage, ModelRole
 from packages.conversation.provider import ModelProvider
 
 _FILE_READ_VERB = re.compile(
-    r"\b(?:leia|ler|abra|abrir|consulte|consultar)\b|\bveja\s+o\s+arquivo\b",
+    r"\b(?:leia|ler|abra|abrir|consulte|consultar|resuma|resumir|mostre|mostrar|"
+    r"retorne|retornar)\b|\bveja\s+o\s+arquivo\b",
     re.IGNORECASE,
 )
 _FILE_REFERENCE = re.compile(
@@ -23,10 +24,8 @@ _FILE_LIST_REQUEST = re.compile(
     r"\bveja\s+quais\s+arquivos\b",
     re.IGNORECASE,
 )
-_EXPLICIT_FILE_READ = re.compile(
-    r"^\s*(?:leia|abra|consulte)\s+(?:o\s+arquivo\s+)?"
-    r"(?P<path>(?:[\w.@+-]+[/\\])*[\w@+-]+(?:\.[\w@+-]+)+)"
-    r"(?=$|[\s.,;:!?])",
+_DIRECT_FILE_ACTION = re.compile(
+    r"^\s*(?:leia|abra|consulte|resuma|mostre|retorne)\b",
     re.IGNORECASE,
 )
 _INTERPRETER_INSTRUCTION = "\n".join(
@@ -101,10 +100,12 @@ def detect_explicit_file_read(user_input: str) -> ReadTextFileIntent | None:
     message = user_input.strip()
     if not message or "\n" in message or "\r" in message:
         return None
-    match = _EXPLICIT_FILE_READ.match(message)
+    if _DIRECT_FILE_ACTION.match(message) is None:
+        return None
+    match = _FILE_REFERENCE.search(message)
     if match is None:
         return None
-    return ReadTextFileIntent(match.group("path"))
+    return ReadTextFileIntent(match.group(0))
 
 
 def _parse_interpretation(response: str) -> FileIntent | None:

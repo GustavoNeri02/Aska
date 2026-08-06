@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from pathlib import PurePosixPath
 
 from capabilities.filesystem import (
     ListFilesCapability,
@@ -46,6 +47,16 @@ class NaturalFileReadHandler:
 
     def _handle_read(self, user_input: str, intent: ReadTextFileIntent) -> bool:
         result = self._file_reader.read(intent.path)
+        if (
+            result.status is ReadTextFileStatus.NOT_FOUND
+            and self._file_lister is not None
+            and _is_bare_filename(intent.path)
+        ):
+            discovered_path = self._discover_file_by_name(intent.path)
+            if discovered_path is False:
+                return True
+            if isinstance(discovered_path, str):
+                result = self._file_reader.read(discovered_path)
         if result.status is not ReadTextFileStatus.SUCCESS:
             self._output_writer(_read_error_message(result.status))
             return True
@@ -58,6 +69,36 @@ class NaturalFileReadHandler:
             content=result.content,
         )
         return True
+
+    def _discover_file_by_name(self, filename: str) -> str | bool | None:
+        if self._file_lister is None:
+            return None
+        listing = self._file_lister.list(name_contains=filename)
+        if listing.status not in {
+            ListFilesStatus.SUCCESS,
+            ListFilesStatus.LIMIT_REACHED,
+        }:
+            self._output_writer("Não foi possível procurar o arquivo no workspace.")
+            return False
+
+        normalized_filename = filename.casefold()
+        matches = tuple(
+            path
+            for path in listing.paths
+            if PurePosixPath(path).name.casefold() == normalized_filename
+        )
+        if listing.status is ListFilesStatus.SUCCESS and len(matches) == 1:
+            return matches[0]
+        if not matches and listing.status is ListFilesStatus.SUCCESS:
+            return None
+
+        candidates = "\n".join(f"- {path}" for path in matches)
+        if not candidates:
+            candidates = "- A busca atingiu o limite antes de encontrar uma correspondência segura."
+        self._output_writer(
+            f"Não foi possível escolher um único arquivo. Informe o caminho relativo:\n{candidates}"
+        )
+        return False
 
     def _handle_list(self, user_input: str, intent: ListFilesIntent) -> bool:
         if self._file_lister is None:
@@ -99,9 +140,12 @@ class NaturalFileReadHandler:
 
 def _read_error_message(status: ReadTextFileStatus) -> str:
     messages = {
-        ReadTextFileStatus.INVALID_PATH: "O caminho informado não é válido.",
+        ReadTextFileStatus.INVALID_PATH: (
+            "O caminho informado não é válido. Use um caminho relativo ao workspace."
+        ),
         ReadTextFileStatus.OUTSIDE_WORKSPACE: (
-            "Acesso negado: o arquivo deve estar dentro do workspace permitido."
+            "Acesso negado: o arquivo deve estar dentro do workspace permitido. "
+            "Use um caminho relativo ao workspace."
         ),
         ReadTextFileStatus.NOT_FOUND: "O arquivo informado não foi encontrado.",
         ReadTextFileStatus.NOT_FILE: "O caminho informado não aponta para um arquivo.",
@@ -124,3 +168,7 @@ def _list_error_message(status: ListFilesStatus) -> str:
         ListFilesStatus.READ_FAILED: "Não foi possível listar o diretório informado.",
     }
     return messages[status]
+
+
+def _is_bare_filename(path: str) -> bool:
+    return "/" not in path and "\\" not in path
