@@ -1,5 +1,6 @@
 from collections.abc import Callable
 
+from apps.cli.confirmation import ConfirmationDecision, parse_confirmation
 from packages.conversation import (
     AddMemoryIntent,
     DeleteMemoryIntent,
@@ -117,8 +118,8 @@ class NaturalMemoryHandler:
         return True
 
     def _handle_pending(self, user_input: str) -> None:
-        normalized_input = user_input.casefold()
-        if normalized_input in {"sim", "confirmar", "confirmo"}:
+        decision = parse_confirmation(user_input)
+        if decision is ConfirmationDecision.CONFIRM:
             confirmed = self._pending
             self._pending = None
             if isinstance(confirmed, PendingMemoryEdit):
@@ -139,7 +140,7 @@ class NaturalMemoryHandler:
                 present_memory_add_result(result, self._output_writer)
             return
 
-        if normalized_input in {"não", "nao", "cancelar", "cancela"}:
+        if decision is ConfirmationDecision.CANCEL:
             cancelled = self._pending
             self._pending = None
             if isinstance(cancelled, PendingMemoryEdit):

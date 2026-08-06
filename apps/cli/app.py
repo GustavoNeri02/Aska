@@ -9,9 +9,11 @@ from apps.cli.handlers import (
     NaturalFileReadHandler,
     NaturalFileSearchHandler,
     NaturalMemoryHandler,
+    NaturalOpenLocationHandler,
     handle_memory_command,
 )
 from apps.cli.loading import run_with_loading
+from capabilities.desktop import OpenWorkspaceLocationCapability, WindowsExplorerLauncher
 from capabilities.filesystem import (
     ListFilesCapability,
     ReadTextFileCapability,
@@ -23,9 +25,11 @@ from packages.conversation import (
     MemoryIntentInterpreter,
     ModelFileIntentInterpreter,
     ModelMemoryIntentInterpreter,
+    ModelOpenLocationIntentInterpreter,
     ModelProvider,
     ModelProviderError,
     ModelTextSearchIntentInterpreter,
+    OpenLocationIntentInterpreter,
     TextSearchIntentInterpreter,
 )
 from packages.inference import OllamaProvider
@@ -55,6 +59,8 @@ def run_conversation_loop(
     file_intent_interpreter: FileIntentInterpreter | None = None,
     file_searcher: SearchTextCapability | None = None,
     text_search_intent_interpreter: TextSearchIntentInterpreter | None = None,
+    open_location_capability: OpenWorkspaceLocationCapability | None = None,
+    open_location_intent_interpreter: OpenLocationIntentInterpreter | None = None,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
 ) -> None:
@@ -91,6 +97,16 @@ def run_conversation_loop(
         if file_searcher is not None and text_search_intent_interpreter is not None
         else None
     )
+    natural_open_location_handler = (
+        NaturalOpenLocationHandler(
+            open_location_capability,
+            open_location_intent_interpreter,
+            output_writer,
+        )
+        if open_location_capability is not None
+        and open_location_intent_interpreter is not None
+        else None
+    )
 
     while True:
         try:
@@ -113,9 +129,15 @@ def run_conversation_loop(
         try:
             if isinstance(parsed_input, MemoryCommand):
                 natural_memory_handler.cancel_pending_for_literal_command()
+                if natural_open_location_handler is not None:
+                    natural_open_location_handler.cancel_pending_for_literal_command()
                 handle_memory_command(parsed_input, memory_service, output_writer)
             elif isinstance(parsed_input, ChatMessage):
                 if natural_memory_handler.handle(parsed_input.content):
+                    continue
+                if natural_open_location_handler is not None and (
+                    natural_open_location_handler.handle(parsed_input.content)
+                ):
                     continue
                 if natural_file_search_handler is not None and natural_file_search_handler.handle(
                     parsed_input.content
@@ -144,6 +166,13 @@ def main() -> None:
     except (OSError, ValueError):
         print("Aska > Workspace de leitura inválido.")
         return
+    try:
+        open_location_capability = OpenWorkspaceLocationCapability(
+            workspace_root,
+            WindowsExplorerLauncher(),
+        )
+    except ValueError:
+        open_location_capability = None
 
     model = os.getenv("ASKA_MODEL", "gemma3:12b")
     model_provider = OllamaProvider(
@@ -156,6 +185,7 @@ def main() -> None:
     memory_intent_interpreter = ModelMemoryIntentInterpreter(model_provider)
     file_intent_interpreter = ModelFileIntentInterpreter(model_provider)
     text_search_intent_interpreter = ModelTextSearchIntentInterpreter(model_provider)
+    open_location_intent_interpreter = ModelOpenLocationIntentInterpreter(model_provider)
 
     try:
         try:
@@ -172,6 +202,8 @@ def main() -> None:
             file_intent_interpreter=file_intent_interpreter,
             file_searcher=file_searcher,
             text_search_intent_interpreter=text_search_intent_interpreter,
+            open_location_capability=open_location_capability,
+            open_location_intent_interpreter=open_location_intent_interpreter,
         )
     finally:
         with suppress(ModelProviderError):

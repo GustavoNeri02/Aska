@@ -1,4 +1,5 @@
 from apps.cli.handlers.memory import handle_memory_command
+from apps.cli.handlers.natural_desktop import NaturalOpenLocationHandler
 from apps.cli.handlers.natural_file import NaturalFileReadHandler
 from apps.cli.handlers.natural_memory import (
     NaturalMemoryHandler,
@@ -15,6 +16,7 @@ __all__ = [
     "NaturalFileReadHandler",
     "NaturalFileSearchHandler",
     "NaturalMemoryHandler",
+    "NaturalOpenLocationHandler",
     "handle_memory_command",
     "present_memory_add_proposal",
     "present_memory_add_result",

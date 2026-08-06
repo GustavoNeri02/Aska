@@ -5,6 +5,7 @@ import pytest
 
 from apps.cli.app import build_banner, main
 from apps.cli.loading import run_with_loading
+from capabilities.desktop import OpenWorkspaceLocationCapability
 from capabilities.filesystem import (
     ListFilesCapability,
     ReadTextFileCapability,
@@ -106,6 +107,10 @@ def test_main_configures_file_reader_with_allowed_workspace(
     monkeypatch.setattr("apps.cli.app.run_with_loading", lambda action, message: action())
     monkeypatch.setattr("apps.cli.app.run_conversation_loop", capture_configuration)
     monkeypatch.setattr("apps.cli.app.OllamaProvider.unload", lambda self: None)
+    monkeypatch.setattr(
+        "apps.cli.app.WindowsExplorerLauncher",
+        lambda: object(),
+    )
 
     main()
 
@@ -116,6 +121,11 @@ def test_main_configures_file_reader_with_allowed_workspace(
     assert configured["file_intent_interpreter"] is not None
     assert isinstance(configured["file_searcher"], SearchTextCapability)
     assert configured["text_search_intent_interpreter"] is not None
+    assert isinstance(
+        configured["open_location_capability"],
+        OpenWorkspaceLocationCapability,
+    )
+    assert configured["open_location_intent_interpreter"] is not None
 
 
 @pytest.mark.parametrize("workspace_kind", ["missing", "file"])

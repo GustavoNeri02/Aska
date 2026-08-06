@@ -84,6 +84,12 @@ A primeira busca dentro do conteúdo de arquivos é literal, sem distinção de 
 
 Quando uma localização explícita por nome e extensão não encontra resultado exato, o CLI pode sugerir caminhos semelhantes da mesma extensão. A comparação é local e pura, normaliza caixa e acentos, reconhece plurais simples e usa `difflib.SequenceMatcher` com corte e quantidade limitados. Sugestões não são leitura, busca semântica ou autorização: o modelo não é chamado, nenhum arquivo é escolhido ou aberto automaticamente e todas as candidatas já passaram pela listagem confinada ao workspace.
 
+### Primeira ação externa por proposta confirmada — `implemented`
+
+A primeira ação no computador abre somente uma pasta existente e confinada a `ASKA_WORKSPACE_ROOT` no Explorador de Arquivos do Windows. Detectores locais ou um intérprete de JSON estrito podem produzir apenas o caminho relativo; o modelo não executa, não escolhe aplicativos e não concede acesso. `OpenWorkspaceLocationCapability` separa preparação e execução, guarda o caminho resolvido e a identidade do diretório como snapshot e revalida tudo depois da confirmação. Mudança do alvo cancela a execução. `LocationLauncher` é o limite injetável e o adaptador atual chama um `explorer.exe` previamente resolvido com `shell=False` e argumentos separados.
+
+O CLI apresenta aplicativo e pasta exatos antes de aceitar `sim`; cancelamento e respostas ambíguas permanecem locais. O parser textual de confirmação é compartilhado com os fluxos de memória, mas estados, políticas e efeitos continuam em handlers específicos. Não foi introduzido registry, planner, manifesto ou ação genérica. Abertura arbitrária de aplicativos ou arquivos, comandos, shell, mouse, teclado, navegador e interação desktop geral continuam `planned`.
+
 ## Decisões substituídas, rejeitadas ou adiadas
 
 - Automação como núcleo — `superseded` por conversa e IA pessoal como núcleo.

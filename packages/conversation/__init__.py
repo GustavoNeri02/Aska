@@ -6,6 +6,13 @@ from packages.conversation.model import (
     ModelMessage,
     ModelRole,
 )
+from packages.conversation.natural_desktop import (
+    ModelOpenLocationIntentInterpreter,
+    OpenLocationIntentInterpreter,
+    OpenWorkspaceLocationIntent,
+    detect_explicit_open_location,
+    should_interpret_open_location,
+)
 from packages.conversation.natural_file import (
     FileIntent,
     FileIntentInterpreter,
@@ -68,9 +75,12 @@ __all__ = [
     "MemoryIntent",
     "MemoryIntentInterpreter",
     "ModelMemoryIntentInterpreter",
+    "ModelOpenLocationIntentInterpreter",
     "ModelTextSearchIntentInterpreter",
     "ModelFileIntentInterpreter",
     "NameUpdateIntent",
+    "OpenLocationIntentInterpreter",
+    "OpenWorkspaceLocationIntent",
     "PendingMemoryAdd",
     "PendingMemoryDelete",
     "PendingMemoryEdit",
@@ -84,6 +94,7 @@ __all__ = [
     "detect_explicit_text_search",
     "detect_explicit_file_read",
     "detect_explicit_file_location",
+    "detect_explicit_open_location",
     "detect_known_document_query",
     "find_name_memory_candidates",
     "should_interpret_memory_add",
@@ -91,6 +102,7 @@ __all__ = [
     "should_interpret_memory_edit",
     "should_interpret_name_change",
     "should_interpret_memory_intent",
+    "should_interpret_open_location",
     "should_interpret_text_search",
     "should_interpret_file_read",
 ]
