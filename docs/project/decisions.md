@@ -72,6 +72,8 @@ O filesystem read-only opera dentro de um workspace explicitamente configurado e
 
 `ListFilesCapability` é uma operação read-only separada que descobre caminhos relativos sem ler conteúdo. A enumeração limita profundidade e quantidade de resultados, ignora diretórios de infraestrutura conhecidos e não segue symlinks que escapem do workspace. `NaturalFileReadHandler` coordena os dois fluxos específicos no CLI e entrega o conteúdo ou a listagem a `ConversationService` em uma mensagem `user` temporária marcada como dado não confiável; esse contexto não altera a identidade em `system` nem entra no histórico. Leitura automática de múltiplos arquivos, busca pelo conteúdo e escrita permanecem `planned`. Não foi criado registry, manifesto, planner, tool calling ou abstração genérica de capabilities.
 
+Além de comandos diretos, perguntas de conteúdo sobre os documentos conhecidos `README`, `AGENTS`, `roadmap` e decisões são detectadas local e deterministicamente. A referência ao documento e uma forma interrogativa, predicado de conteúdo ou ação direta devem estar presentes; menções genéricas não acionam leitura. Pedidos de localização com nome de arquivo explícito são determinísticos; demais pedidos com expressão clara de localização e referência a arquivo ou documento podem gerar somente uma intenção estruturada de listagem. Uma listagem vazia produz resposta local sem chamada ao provider. Os fluxos reutilizam descoberta por nome, confinamento e contexto temporário existentes, sem conceder ao modelo decisão de acesso ou leitura durante a localização.
+
 ## Decisões substituídas, rejeitadas ou adiadas
 
 - Automação como núcleo — `superseded` por conversa e IA pessoal como núcleo.

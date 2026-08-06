@@ -85,6 +85,29 @@ def test_bare_filename_is_discovered_and_read_when_match_is_unique(tmp_path: Pat
     assert "Visão encontrada pelo nome." in provider.messages[0][-2].content
 
 
+def test_known_document_question_reads_document_without_interpreter(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    roadmap = workspace / "docs" / "project" / "roadmap.md"
+    roadmap.parent.mkdir(parents=True)
+    roadmap.write_text("Fase 4 está em progresso.", encoding="utf-8")
+    provider = FakeProvider()
+    interpreter = FakeFileIntentInterpreter(None)
+
+    run_conversation_loop(
+        provider,
+        memory_service=create_memory_service(tmp_path / "memories.json"),
+        file_reader=ReadTextFileCapability(workspace.resolve()),
+        file_lister=ListFilesCapability(workspace.resolve()),
+        file_intent_interpreter=interpreter,
+        input_reader=create_input_reader(["Qual fase está em progresso no roadmap?", "sair"]),
+        output_writer=lambda message: None,
+    )
+
+    assert interpreter.inputs == []
+    assert "Fonte: docs/project/roadmap.md" in provider.messages[0][-2].content
+    assert "Fase 4 está em progresso." in provider.messages[0][-2].content
+
+
 def test_bare_filename_with_multiple_matches_requests_relative_path(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     for directory in (workspace / "docs", workspace / "notes"):
@@ -248,3 +271,54 @@ def test_file_listing_is_temporary_context_and_does_not_read_contents(
     assert "- app.py" in provider.messages[0][-2].content
     assert "segredo do arquivo" not in provider.messages[0][-2].content
     assert not any("- app.py" in message.content for message in provider.messages[1])
+
+
+def test_natural_file_location_lists_path_without_reading_content(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    memory_file = workspace / "data" / "memory" / "memories.json"
+    memory_file.parent.mkdir(parents=True)
+    memory_file.write_text('{"secret":"must not be read"}', encoding="utf-8")
+    provider = FakeProvider()
+    interpreter = FakeFileIntentInterpreter(
+        ListFilesIntent(name_contains="memori", extension=".json")
+    )
+    message = "Onde está o arquivo de memória em json no projeto Aska?"
+
+    run_conversation_loop(
+        provider,
+        memory_service=create_memory_service(tmp_path / "memories.json"),
+        file_reader=ReadTextFileCapability(workspace.resolve()),
+        file_lister=ListFilesCapability(workspace.resolve()),
+        file_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=lambda output: None,
+    )
+
+    assert interpreter.inputs == [message]
+    assert "- data/memory/memories.json" in provider.messages[0][-2].content
+    assert "must not be read" not in provider.messages[0][-2].content
+
+
+def test_empty_file_listing_is_reported_locally_without_conversation_provider(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    provider = FakeProvider()
+    interpreter = FakeFileIntentInterpreter(None)
+    output: list[str] = []
+    message = "Onde está o arquivo memory.json?"
+
+    run_conversation_loop(
+        provider,
+        memory_service=create_memory_service(tmp_path / "memories.json"),
+        file_reader=ReadTextFileCapability(workspace.resolve()),
+        file_lister=ListFilesCapability(workspace.resolve()),
+        file_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=output.append,
+    )
+
+    assert interpreter.inputs == []
+    assert provider.messages == []
+    assert "Nenhum arquivo correspondente foi encontrado." in output

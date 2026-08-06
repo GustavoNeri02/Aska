@@ -24,10 +24,37 @@ _FILE_LIST_REQUEST = re.compile(
     r"\bveja\s+quais\s+arquivos\b",
     re.IGNORECASE,
 )
+_FILE_LOCATION_REQUEST = re.compile(
+    r"\b(?:onde\s+(?:est[aá]|fica)|qual\s+(?:[eé]\s+)?o\s+caminho)\b.*"
+    r"\b(?:arquivo|documento)\b",
+    re.IGNORECASE,
+)
 _DIRECT_FILE_ACTION = re.compile(
     r"^\s*(?:leia|abra|consulte|resuma|mostre|retorne)\b",
     re.IGNORECASE,
 )
+_KNOWN_DOCUMENT_REFERENCE = re.compile(
+    r"\b(?:(?:o|no|do)\s+)(?:(?:documento|arquivo)\s+(?:de|das?)\s+)?"
+    r"(?P<name>readme|agents|roadmap|decis[oõ]es)(?:\.md)?\b|"
+    r"\b(?P<filename>readme|agents|roadmap|decis[oõ]es)\.md\b",
+    re.IGNORECASE,
+)
+_CONTENT_QUESTION_START = re.compile(
+    r"^\s*(?:qual|quais|o\s+que|como|onde|quando|por\s+que|porque)\b",
+    re.IGNORECASE,
+)
+_KNOWN_DOCUMENT_PREDICATE = re.compile(
+    r"\b(?:readme|agents|roadmap)(?:\.md)?\b.*"
+    r"\b(?:diz|fala|define|menciona|orienta|explica|prev[eê]|cont[eé]m)\b",
+    re.IGNORECASE,
+)
+_KNOWN_DOCUMENT_PATHS = {
+    "readme": "README.md",
+    "agents": "AGENTS.md",
+    "roadmap": "roadmap.md",
+    "decisões": "decisions.md",
+    "decisoes": "decisions.md",
+}
 _INTERPRETER_INSTRUCTION = "\n".join(
     (
         "Apenas classifique o pedido. Não responda ao usuário, não leia arquivos "
@@ -47,6 +74,9 @@ _INTERPRETER_INSTRUCTION = "\n".join(
         'Saída: {"action":"list_files","directory":".","name_contains":"roadmap","extension":null}',
         "Entrada: Veja quais arquivos Python existem.",
         'Saída: {"action":"list_files","directory":".","name_contains":null,"extension":".py"}',
+        "Entrada: Onde está o arquivo de memória em JSON no projeto Aska?",
+        'Saída: {"action":"list_files","directory":".","name_contains":"memori",'
+        '"extension":".json"}',
         "Entrada: Explique como arquivos funcionam em Python.",
         'Saída: {"action":"none"}',
         "Não invente caminhos e não produza mais de uma ação.",
@@ -93,7 +123,10 @@ def should_interpret_file_read(user_input: str) -> bool:
         return False
     return (
         _FILE_READ_VERB.search(message) is not None and _FILE_REFERENCE.search(message) is not None
-    ) or _FILE_LIST_REQUEST.search(message) is not None
+    ) or (
+        _FILE_LIST_REQUEST.search(message) is not None
+        or _FILE_LOCATION_REQUEST.search(message) is not None
+    )
 
 
 def detect_explicit_file_read(user_input: str) -> ReadTextFileIntent | None:
@@ -106,6 +139,33 @@ def detect_explicit_file_read(user_input: str) -> ReadTextFileIntent | None:
     if match is None:
         return None
     return ReadTextFileIntent(match.group(0))
+
+
+def detect_explicit_file_location(user_input: str) -> ListFilesIntent | None:
+    message = user_input.strip()
+    if not message or "\n" in message or "\r" in message:
+        return None
+    if _FILE_LOCATION_REQUEST.search(message) is None:
+        return None
+    match = _FILE_REFERENCE.search(message)
+    if match is None or "/" in match.group(0) or "\\" in match.group(0):
+        return None
+    return ListFilesIntent(name_contains=match.group(0))
+
+
+def detect_known_document_query(user_input: str) -> ReadTextFileIntent | None:
+    message = user_input.strip()
+    if not message or "\n" in message or "\r" in message:
+        return None
+    reference = _KNOWN_DOCUMENT_REFERENCE.search(message)
+    if reference is None or (
+        _CONTENT_QUESTION_START.search(message) is None
+        and _KNOWN_DOCUMENT_PREDICATE.search(message) is None
+        and _DIRECT_FILE_ACTION.match(message) is None
+    ):
+        return None
+    document_name = reference.group("name") or reference.group("filename")
+    return ReadTextFileIntent(_KNOWN_DOCUMENT_PATHS[document_name.casefold()])
 
 
 def _parse_interpretation(response: str) -> FileIntent | None:

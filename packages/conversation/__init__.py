@@ -12,7 +12,9 @@ from packages.conversation.natural_file import (
     ListFilesIntent,
     ModelFileIntentInterpreter,
     ReadTextFileIntent,
+    detect_explicit_file_location,
     detect_explicit_file_read,
+    detect_known_document_query,
     should_interpret_file_read,
 )
 from packages.conversation.natural_memory import (
@@ -70,6 +72,8 @@ __all__ = [
     "detect_memory_delete",
     "detect_name_change",
     "detect_explicit_file_read",
+    "detect_explicit_file_location",
+    "detect_known_document_query",
     "find_name_memory_candidates",
     "should_interpret_memory_add",
     "should_interpret_memory_delete",

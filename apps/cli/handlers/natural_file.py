@@ -13,7 +13,9 @@ from packages.conversation import (
     FileIntentInterpreter,
     ListFilesIntent,
     ReadTextFileIntent,
+    detect_explicit_file_location,
     detect_explicit_file_read,
+    detect_known_document_query,
     should_interpret_file_read,
 )
 
@@ -35,6 +37,10 @@ class NaturalFileReadHandler:
 
     def handle(self, user_input: str) -> bool:
         intent = detect_explicit_file_read(user_input)
+        if intent is None:
+            intent = detect_explicit_file_location(user_input)
+        if intent is None:
+            intent = detect_known_document_query(user_input)
         if intent is None:
             if not should_interpret_file_read(user_input):
                 return False
@@ -114,11 +120,12 @@ class NaturalFileReadHandler:
         }:
             self._output_writer(_list_error_message(result.status))
             return True
+        if not result.paths:
+            self._output_writer("Nenhum arquivo correspondente foi encontrado.")
+            return True
 
         listing = "\n".join(f"- {path}" for path in result.paths)
-        if not listing:
-            listing = "Nenhum arquivo encontrado para os filtros informados."
-        elif result.status is ListFilesStatus.LIMIT_REACHED:
+        if result.status is ListFilesStatus.LIMIT_REACHED:
             listing = f"{listing}\n- Resultado truncado no limite seguro configurado."
         self._send_with_context(
             user_input,

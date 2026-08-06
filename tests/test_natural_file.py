@@ -7,7 +7,9 @@ from packages.conversation import (
     ModelFileIntentInterpreter,
     ModelMessage,
     ReadTextFileIntent,
+    detect_explicit_file_location,
     detect_explicit_file_read,
+    detect_known_document_query,
     should_interpret_file_read,
 )
 
@@ -76,6 +78,53 @@ def test_explicit_file_path_is_extracted_deterministically(
 
 
 @pytest.mark.parametrize(
+    ("message", "path"),
+    [
+        ("Qual fase está em progresso no roadmap?", "roadmap.md"),
+        ("O que o AGENTS diz sobre testes?", "AGENTS.md"),
+        ("O README fala o quê sobre memória?", "README.md"),
+        ("O que está definido no roadmap.md?", "roadmap.md"),
+        (
+            "Leia o documento de decisões e diga quais decisões estão relacionadas a ferramentas.",
+            "decisions.md",
+        ),
+    ],
+)
+def test_known_document_content_query_is_detected_deterministically(
+    message: str,
+    path: str,
+) -> None:
+    assert detect_known_document_query(message) == ReadTextFileIntent(path)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Qual fase está em progresso?",
+        "Você gosta de roadmaps?",
+        "Como escrever um README?",
+        "O que o documento diz?",
+        "README é um formato comum.",
+    ],
+)
+def test_known_document_query_rejects_ambiguous_conversation(message: str) -> None:
+    assert detect_known_document_query(message) is None
+
+
+def test_file_gate_accepts_clear_file_location_request() -> None:
+    assert (
+        should_interpret_file_read("Onde está o arquivo de memória em json no projeto Aska?")
+        is True
+    )
+
+
+def test_explicit_file_location_is_detected_deterministically() -> None:
+    assert detect_explicit_file_location("Onde está o arquivo memory.json?") == ListFilesIntent(
+        name_contains="memory.json"
+    )
+
+
+@pytest.mark.parametrize(
     "message",
     [
         "Como arquivos funcionam em Python?",
@@ -114,6 +163,19 @@ def test_model_file_interpreter_returns_typed_listing_intent() -> None:
     result = ModelFileIntentInterpreter(provider).interpret("Localize o roadmap.")
 
     assert result == ListFilesIntent(".", "roadmap", ".md")
+
+
+def test_model_file_interpreter_describes_memory_json_location_example() -> None:
+    provider = StaticProvider(
+        '{"action":"list_files","directory":".","name_contains":"memori","extension":".json"}'
+    )
+
+    result = ModelFileIntentInterpreter(provider).interpret(
+        "Onde está o arquivo de memória em json no projeto Aska?"
+    )
+
+    assert result == ListFilesIntent(".", "memori", ".json")
+    assert "arquivo de memória em JSON" in provider.requests[0][0].content
 
 
 @pytest.mark.parametrize(
