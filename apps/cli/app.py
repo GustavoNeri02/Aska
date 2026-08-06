@@ -20,16 +20,16 @@ from capabilities.filesystem import (
     SearchTextCapability,
 )
 from packages.conversation import (
+    CapabilityProposalRouter,
     ConversationService,
     FileIntentInterpreter,
     MemoryIntentInterpreter,
+    ModelCapabilityProposalRouter,
     ModelFileIntentInterpreter,
     ModelMemoryIntentInterpreter,
-    ModelOpenLocationIntentInterpreter,
     ModelProvider,
     ModelProviderError,
     ModelTextSearchIntentInterpreter,
-    OpenLocationIntentInterpreter,
     TextSearchIntentInterpreter,
 )
 from packages.inference import OllamaProvider
@@ -60,7 +60,7 @@ def run_conversation_loop(
     file_searcher: SearchTextCapability | None = None,
     text_search_intent_interpreter: TextSearchIntentInterpreter | None = None,
     open_location_capability: OpenWorkspaceLocationCapability | None = None,
-    open_location_intent_interpreter: OpenLocationIntentInterpreter | None = None,
+    capability_proposal_router: CapabilityProposalRouter | None = None,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
 ) -> None:
@@ -100,11 +100,11 @@ def run_conversation_loop(
     natural_open_location_handler = (
         NaturalOpenLocationHandler(
             open_location_capability,
-            open_location_intent_interpreter,
+            capability_proposal_router,
             output_writer,
         )
         if open_location_capability is not None
-        and open_location_intent_interpreter is not None
+        and capability_proposal_router is not None
         else None
     )
 
@@ -135,16 +135,16 @@ def run_conversation_loop(
             elif isinstance(parsed_input, ChatMessage):
                 if natural_memory_handler.handle(parsed_input.content):
                     continue
-                if natural_open_location_handler is not None and (
-                    natural_open_location_handler.handle(parsed_input.content)
-                ):
-                    continue
                 if natural_file_search_handler is not None and natural_file_search_handler.handle(
                     parsed_input.content
                 ):
                     continue
                 if natural_file_handler is not None and natural_file_handler.handle(
                     parsed_input.content
+                ):
+                    continue
+                if natural_open_location_handler is not None and (
+                    natural_open_location_handler.handle(parsed_input.content)
                 ):
                     continue
                 response = conversation_service.send(parsed_input.content)
@@ -185,7 +185,7 @@ def main() -> None:
     memory_intent_interpreter = ModelMemoryIntentInterpreter(model_provider)
     file_intent_interpreter = ModelFileIntentInterpreter(model_provider)
     text_search_intent_interpreter = ModelTextSearchIntentInterpreter(model_provider)
-    open_location_intent_interpreter = ModelOpenLocationIntentInterpreter(model_provider)
+    capability_proposal_router = ModelCapabilityProposalRouter(model_provider)
 
     try:
         try:
@@ -203,7 +203,7 @@ def main() -> None:
             file_searcher=file_searcher,
             text_search_intent_interpreter=text_search_intent_interpreter,
             open_location_capability=open_location_capability,
-            open_location_intent_interpreter=open_location_intent_interpreter,
+            capability_proposal_router=capability_proposal_router,
         )
     finally:
         with suppress(ModelProviderError):

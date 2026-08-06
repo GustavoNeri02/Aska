@@ -1,3 +1,11 @@
+from packages.conversation.capability_router import (
+    CapabilityProposal,
+    CapabilityProposalRouter,
+    ModelCapabilityProposalRouter,
+    OpenWorkspaceLocationProposal,
+    ProposalRouteResult,
+    ProposalRouteStatus,
+)
 from packages.conversation.context import ContextBuilder
 from packages.conversation.identity import ASKA_IDENTITY
 from packages.conversation.model import (
@@ -6,13 +14,7 @@ from packages.conversation.model import (
     ModelMessage,
     ModelRole,
 )
-from packages.conversation.natural_desktop import (
-    ModelOpenLocationIntentInterpreter,
-    OpenLocationIntentInterpreter,
-    OpenWorkspaceLocationIntent,
-    detect_explicit_open_location,
-    should_interpret_open_location,
-)
+from packages.conversation.natural_desktop import detect_explicit_open_location
 from packages.conversation.natural_file import (
     FileIntent,
     FileIntentInterpreter,
@@ -58,6 +60,8 @@ from packages.conversation.service import ConversationService
 
 __all__ = [
     "ASKA_IDENTITY",
+    "CapabilityProposal",
+    "CapabilityProposalRouter",
     "AddMemoryIntent",
     "DeleteMemoryIntent",
     "EditMemoryIntent",
@@ -75,15 +79,16 @@ __all__ = [
     "MemoryIntent",
     "MemoryIntentInterpreter",
     "ModelMemoryIntentInterpreter",
-    "ModelOpenLocationIntentInterpreter",
+    "ModelCapabilityProposalRouter",
     "ModelTextSearchIntentInterpreter",
     "ModelFileIntentInterpreter",
     "NameUpdateIntent",
-    "OpenLocationIntentInterpreter",
-    "OpenWorkspaceLocationIntent",
+    "OpenWorkspaceLocationProposal",
     "PendingMemoryAdd",
     "PendingMemoryDelete",
     "PendingMemoryEdit",
+    "ProposalRouteResult",
+    "ProposalRouteStatus",
     "ReadTextFileIntent",
     "SearchTextIntent",
     "TextSearchIntentInterpreter",
@@ -102,7 +107,6 @@ __all__ = [
     "should_interpret_memory_edit",
     "should_interpret_name_change",
     "should_interpret_memory_intent",
-    "should_interpret_open_location",
     "should_interpret_text_search",
     "should_interpret_file_read",
 ]

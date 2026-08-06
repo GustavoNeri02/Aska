@@ -8,9 +8,10 @@ from capabilities.desktop import (
     WorkspaceLocationTarget,
 )
 from packages.conversation import (
-    OpenLocationIntentInterpreter,
+    CapabilityProposalRouter,
+    OpenWorkspaceLocationProposal,
+    ProposalRouteStatus,
     detect_explicit_open_location,
-    should_interpret_open_location,
 )
 
 
@@ -18,11 +19,11 @@ class NaturalOpenLocationHandler:
     def __init__(
         self,
         capability: OpenWorkspaceLocationCapability,
-        intent_interpreter: OpenLocationIntentInterpreter,
+        proposal_router: CapabilityProposalRouter,
         output_writer: Callable[[str], None],
     ) -> None:
         self._capability = capability
-        self._intent_interpreter = intent_interpreter
+        self._proposal_router = proposal_router
         self._output_writer = output_writer
         self._pending: WorkspaceLocationTarget | None = None
 
@@ -30,18 +31,24 @@ class NaturalOpenLocationHandler:
         if self._pending is not None:
             return self._handle_confirmation(user_input)
 
-        intent = detect_explicit_open_location(user_input)
-        if intent is None:
-            if not should_interpret_open_location(user_input):
+        proposal = detect_explicit_open_location(user_input)
+        if proposal is None:
+            route = self._proposal_router.route(user_input)
+            if route.status is ProposalRouteStatus.NONE:
                 return False
-            intent = self._intent_interpreter.interpret(user_input)
-        if intent is None:
+            if route.status is ProposalRouteStatus.INVALID_RESPONSE:
+                self._output_writer(
+                    "Não foi possível interpretar uma proposta de ação com segurança."
+                )
+                return True
+            proposal = route.proposal
+        if not isinstance(proposal, OpenWorkspaceLocationProposal):
             self._output_writer(
-                "Não foi possível identificar uma pasta do workspace para abrir."
+                "A proposta não corresponde a uma capability disponível."
             )
             return True
 
-        result = self._capability.prepare(intent.path)
+        result = self._capability.prepare(proposal.path)
         if result.status is not ResolveLocationStatus.SUCCESS:
             self._output_writer(_resolve_error_message(result.status))
             return True

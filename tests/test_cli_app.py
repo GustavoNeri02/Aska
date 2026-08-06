@@ -125,7 +125,7 @@ def test_main_configures_file_reader_with_allowed_workspace(
         configured["open_location_capability"],
         OpenWorkspaceLocationCapability,
     )
-    assert configured["open_location_intent_interpreter"] is not None
+    assert configured["capability_proposal_router"] is not None
 
 
 @pytest.mark.parametrize("workspace_kind", ["missing", "file"])
