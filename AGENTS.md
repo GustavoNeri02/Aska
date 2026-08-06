@@ -26,7 +26,7 @@ Responda normalmente em português do Brasil, apresente primeiro a ação práti
 ## Regras de colaboração
 
 - Preserve a arquitetura documentada e atualize o documento responsável quando uma decisão mudar.
-- Prefira mudanças pequenas, revisáveis, executáveis e cobertas por testes proporcionais.
+- Prefira mudanças pequenas, revisáveis, executáveis, cobertas por testes proporcionais e modulares.
 - Não adicione dependências sem explicar qual problema concreto resolvem.
 - Não introduza abstrações, frameworks ou módulos vazios antecipadamente.
 - Mantenha pontos de entrada pequenos e injete dependências por parâmetros enquanto isso for suficiente.
