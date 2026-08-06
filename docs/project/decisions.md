@@ -38,7 +38,7 @@ O domínio e as regras de memória são separados da persistência por `MemorySe
 
 ### Conversa independente da interface — `implemented`
 
-Histórico da sessão, composição de contexto e chamada ao modelo pertencem a `packages/conversation`. No CLI, `app.py` mantém loop, apresentação, lifecycle e composition root; `CliActionCoordinator` faz somente precedência, cancelamento e despacho fechado dos handlers explícitos de desktop, testes e lint. `NaturalMemoryHandler` continua separado. A composição de dependências permanece manual no entry point, sem container de injeção, registry ou descoberta dinâmica.
+Histórico da sessão, composição de contexto e chamada ao modelo pertencem a `packages/conversation`. No CLI, `app.py` mantém configuration, lifecycle e composition root; `conversation_loop.py` mantém entrada, tratamento de falhas e `CliSession`, responsável pelo roteamento e pela apresentação de uma sessão composta. `CliActionCoordinator` faz somente precedência, cancelamento e despacho fechado dos handlers explícitos de desktop, testes e lint. `NaturalMemoryHandler` continua separado. A composição de dependências permanece manual no entry point, sem container de injeção, registry ou descoberta dinâmica.
 
 ### Provider como port da conversa — `implemented`
 
