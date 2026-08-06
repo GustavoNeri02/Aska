@@ -9,9 +9,11 @@ from apps.cli.handlers.natural_memory import (
     present_memory_edit_proposal,
     present_memory_edit_result,
 )
+from apps.cli.handlers.natural_search import NaturalFileSearchHandler
 
 __all__ = [
     "NaturalFileReadHandler",
+    "NaturalFileSearchHandler",
     "NaturalMemoryHandler",
     "handle_memory_command",
     "present_memory_add_proposal",

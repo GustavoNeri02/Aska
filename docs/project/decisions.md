@@ -74,6 +74,12 @@ O filesystem read-only opera dentro de um workspace explicitamente configurado e
 
 Além de comandos diretos, perguntas de conteúdo sobre os documentos conhecidos `README`, `AGENTS`, `roadmap` e decisões são detectadas local e deterministicamente. A referência ao documento e uma forma interrogativa, predicado de conteúdo ou ação direta devem estar presentes; menções genéricas não acionam leitura. Pedidos de localização com nome de arquivo explícito são determinísticos; demais pedidos com expressão clara de localização e referência a arquivo ou documento podem gerar somente uma intenção estruturada de listagem. Uma listagem vazia produz resposta local sem chamada ao provider. Os fluxos reutilizam descoberta por nome, confinamento e contexto temporário existentes, sem conceder ao modelo decisão de acesso ou leitura durante a localização.
 
+### Busca textual literal confinada — `implemented`
+
+A primeira busca dentro de arquivos é literal, sem distinção de caixa, read-only e confinada ao workspace. `SearchTextCapability` compõe internamente as políticas existentes de listagem e leitura e retorna correspondências tipadas com caminho relativo, linha e trecho, sob limites de arquivos, profundidade, tamanho, query, resultados e trecho. Não há regex, fuzzy matching, busca semântica, embeddings ou índice persistente.
+
+`SearchTextIntent` e seu intérprete pertencem a `packages/conversation/natural_search.py`; termos entre aspas usam extração determinística e paráfrases claras passam por gate próprio e JSON estrito. `NaturalFileSearchHandler` permanece separado do handler de leitura/listagem e roda antes dele no CLI. Zero resultados e falhas são apresentados localmente; somente correspondências não vazias entram como contexto temporário não confiável para a resposta atual e não são copiadas para o histórico.
+
 ## Decisões substituídas, rejeitadas ou adiadas
 
 - Automação como núcleo — `superseded` por conversa e IA pessoal como núcleo.

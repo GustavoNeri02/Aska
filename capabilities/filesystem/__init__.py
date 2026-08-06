@@ -8,6 +8,12 @@ from capabilities.filesystem.reader import (
     ReadTextFileResult,
     ReadTextFileStatus,
 )
+from capabilities.filesystem.searcher import (
+    SearchTextCapability,
+    SearchTextResult,
+    SearchTextStatus,
+    TextSearchMatch,
+)
 
 __all__ = [
     "ListFilesCapability",
@@ -16,4 +22,8 @@ __all__ = [
     "ReadTextFileCapability",
     "ReadTextFileResult",
     "ReadTextFileStatus",
+    "SearchTextCapability",
+    "SearchTextResult",
+    "SearchTextStatus",
+    "TextSearchMatch",
 ]

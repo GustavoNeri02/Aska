@@ -39,6 +39,13 @@ from packages.conversation.natural_memory import (
     should_interpret_memory_intent,
     should_interpret_name_change,
 )
+from packages.conversation.natural_search import (
+    ModelTextSearchIntentInterpreter,
+    SearchTextIntent,
+    TextSearchIntentInterpreter,
+    detect_explicit_text_search,
+    should_interpret_text_search,
+)
 from packages.conversation.provider import ModelProvider, ModelProviderError
 from packages.conversation.service import ConversationService
 
@@ -61,16 +68,20 @@ __all__ = [
     "MemoryIntent",
     "MemoryIntentInterpreter",
     "ModelMemoryIntentInterpreter",
+    "ModelTextSearchIntentInterpreter",
     "ModelFileIntentInterpreter",
     "NameUpdateIntent",
     "PendingMemoryAdd",
     "PendingMemoryDelete",
     "PendingMemoryEdit",
     "ReadTextFileIntent",
+    "SearchTextIntent",
+    "TextSearchIntentInterpreter",
     "canonical_name_memory",
     "detect_memory_add",
     "detect_memory_delete",
     "detect_name_change",
+    "detect_explicit_text_search",
     "detect_explicit_file_read",
     "detect_explicit_file_location",
     "detect_known_document_query",
@@ -80,5 +91,6 @@ __all__ = [
     "should_interpret_memory_edit",
     "should_interpret_name_change",
     "should_interpret_memory_intent",
+    "should_interpret_text_search",
     "should_interpret_file_read",
 ]

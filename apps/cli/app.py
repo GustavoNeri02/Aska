@@ -7,11 +7,16 @@ from apps.cli.command_parser import parse_input
 from apps.cli.commands import ChatMessage, ExitCommand, InvalidCommand, MemoryCommand
 from apps.cli.handlers import (
     NaturalFileReadHandler,
+    NaturalFileSearchHandler,
     NaturalMemoryHandler,
     handle_memory_command,
 )
 from apps.cli.loading import run_with_loading
-from capabilities.filesystem import ListFilesCapability, ReadTextFileCapability
+from capabilities.filesystem import (
+    ListFilesCapability,
+    ReadTextFileCapability,
+    SearchTextCapability,
+)
 from packages.conversation import (
     ConversationService,
     FileIntentInterpreter,
@@ -20,6 +25,8 @@ from packages.conversation import (
     ModelMemoryIntentInterpreter,
     ModelProvider,
     ModelProviderError,
+    ModelTextSearchIntentInterpreter,
+    TextSearchIntentInterpreter,
 )
 from packages.inference import OllamaProvider
 from packages.memory import (
@@ -46,6 +53,8 @@ def run_conversation_loop(
     file_reader: ReadTextFileCapability | None = None,
     file_lister: ListFilesCapability | None = None,
     file_intent_interpreter: FileIntentInterpreter | None = None,
+    file_searcher: SearchTextCapability | None = None,
+    text_search_intent_interpreter: TextSearchIntentInterpreter | None = None,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
 ) -> None:
@@ -70,6 +79,16 @@ def run_conversation_loop(
             file_lister,
         )
         if file_reader is not None and file_intent_interpreter is not None
+        else None
+    )
+    natural_file_search_handler = (
+        NaturalFileSearchHandler(
+            file_searcher,
+            text_search_intent_interpreter,
+            conversation_service,
+            output_writer,
+        )
+        if file_searcher is not None and text_search_intent_interpreter is not None
         else None
     )
 
@@ -98,6 +117,10 @@ def run_conversation_loop(
             elif isinstance(parsed_input, ChatMessage):
                 if natural_memory_handler.handle(parsed_input.content):
                     continue
+                if natural_file_search_handler is not None and natural_file_search_handler.handle(
+                    parsed_input.content
+                ):
+                    continue
                 if natural_file_handler is not None and natural_file_handler.handle(
                     parsed_input.content
                 ):
@@ -117,6 +140,7 @@ def main() -> None:
         )
         file_reader = ReadTextFileCapability(workspace_root)
         file_lister = ListFilesCapability(workspace_root)
+        file_searcher = SearchTextCapability(workspace_root)
     except (OSError, ValueError):
         print("Aska > Workspace de leitura inválido.")
         return
@@ -131,6 +155,7 @@ def main() -> None:
     memory_service = MemoryService(memory_repository)
     memory_intent_interpreter = ModelMemoryIntentInterpreter(model_provider)
     file_intent_interpreter = ModelFileIntentInterpreter(model_provider)
+    text_search_intent_interpreter = ModelTextSearchIntentInterpreter(model_provider)
 
     try:
         try:
@@ -145,6 +170,8 @@ def main() -> None:
             file_reader=file_reader,
             file_lister=file_lister,
             file_intent_interpreter=file_intent_interpreter,
+            file_searcher=file_searcher,
+            text_search_intent_interpreter=text_search_intent_interpreter,
         )
     finally:
         with suppress(ModelProviderError):

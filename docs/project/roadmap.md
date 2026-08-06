@@ -32,6 +32,9 @@
 - Pedidos naturais explícitos de memorização usam padrões determinísticos ou interpretação limitada por modelo para gerar uma proposta; somente a confirmação local aciona `MemoryService.add()`.
 - Pedidos naturais explícitos de exclusão selecionam candidatas localmente e somente a confirmação aciona exclusão por ID e snapshot.
 - Pedidos com caminho explícito usam extração determinística; variações naturais de leitura e pedidos de descoberta passam por gate e interpretação estruturada. Caminhos, permissões e acesso são validados localmente antes de o contexto temporário ser criado.
+- Consultas naturais sobre documentos conhecidos e pedidos explícitos de localização de arquivos usam o fluxo read-only confinado ao workspace; buscas sem resultado encerram localmente sem chamar o modelo.
+- O checkup manual de consultas a documentos conhecidos, localização explícita e buscas vazias foi concluído com sucesso.
+- Busca textual literal dentro de arquivos está `implemented` com intenção e handler próprios, resultados tipados por caminho e linha, limites locais e contexto temporário; seu checkup manual ainda está pendente.
 
 ### Comportamento atual
 
@@ -44,7 +47,7 @@
 
 ### Incremento atual da Fase 4
 
-O recorte read-only atual de Tools and capabilities está `implemented`: `ReadTextFileCapability` lê um arquivo textual conhecido, e `ListFilesCapability` descobre caminhos relativos sem ler conteúdo. Ambas aplicam confinamento local ao workspace e retornam resultados tipados; a listagem também limita profundidade e resultados e ignora diretórios de infraestrutura conhecidos. Quando um pedido de leitura informa somente o nome de um arquivo ausente na raiz, `NaturalFileReadHandler` usa a listagem segura para resolver uma única correspondência exata ou solicita o caminho relativo diante de ambiguidade. O conteúdo ou a listagem é fornecido em uma mensagem `user` separada somente à resposta atual. Não há tool calling, execução arbitrária, escrita, leitura automática de múltiplos arquivos, busca pelo conteúdo, registry ou manifesto genérico de capabilities; esses recursos continuam `planned` quando aplicável.
+O recorte read-only atual de Tools and capabilities está `implemented`: `ReadTextFileCapability` lê um arquivo textual conhecido, `ListFilesCapability` descobre caminhos relativos sem ler conteúdo e `SearchTextCapability` procura texto literal dentro de arquivos elegíveis. Todas aplicam confinamento local ao workspace e retornam resultados tipados; listagem e busca limitam profundidade e quantidade. Consultas naturais sobre documentos conhecidos e localização explícita de arquivos estão `implemented`. Quando um pedido de leitura informa somente o nome de um arquivo ausente na raiz, `NaturalFileReadHandler` usa a listagem segura para resolver uma única correspondência exata ou solicita o caminho relativo diante de ambiguidade; listagens e buscas sem correspondência produzem resposta local e não chamam o provider conversacional. Conteúdo, listagem ou correspondências não vazias são fornecidos em uma mensagem `user` separada somente à resposta atual. O checkup manual de leitura e descoberta foi concluído; o checkup manual da busca textual permanece pendente. Não há tool calling, execução arbitrária, escrita, leitura automática de múltiplos arquivos como contexto integral, busca semântica, regex, indexação persistente, registry ou manifesto genérico de capabilities; esses recursos continuam `planned` quando aplicável.
 
 ### Escopo concluído da Fase 3
 
