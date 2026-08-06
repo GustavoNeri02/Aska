@@ -4,6 +4,7 @@ from packages.conversation.capability_router import (
     ConversationDecisionError,
     OpenWorkspaceLocationProposal,
     ReplyDecision,
+    RunProjectTestsProposal,
 )
 from packages.conversation.context import ContextBuilder
 from packages.conversation.identity import ASKA_IDENTITY
@@ -87,6 +88,7 @@ __all__ = [
     "PendingMemoryDelete",
     "PendingMemoryEdit",
     "ReplyDecision",
+    "RunProjectTestsProposal",
     "ReadTextFileIntent",
     "SearchTextIntent",
     "TextSearchIntentInterpreter",

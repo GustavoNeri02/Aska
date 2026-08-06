@@ -59,3 +59,10 @@ class ConversationService:
         if isinstance(decision, ReplyDecision):
             self._history.append(ConversationTurn(user_message, decision.content))
         return decision
+
+    def record_external_result(self, user_message: str, result_message: str) -> None:
+        normalized_user_message = user_message.strip()
+        normalized_result = result_message.strip()
+        if not normalized_user_message or not normalized_result:
+            raise ValueError("external result turn cannot be empty")
+        self._history.append(ConversationTurn(normalized_user_message, normalized_result))

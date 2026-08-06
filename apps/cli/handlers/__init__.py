@@ -11,12 +11,14 @@ from apps.cli.handlers.natural_memory import (
     present_memory_edit_result,
 )
 from apps.cli.handlers.natural_search import NaturalFileSearchHandler
+from apps.cli.handlers.natural_terminal import NaturalProjectTestsHandler
 
 __all__ = [
     "NaturalFileReadHandler",
     "NaturalFileSearchHandler",
     "NaturalMemoryHandler",
     "NaturalOpenLocationHandler",
+    "NaturalProjectTestsHandler",
     "handle_memory_command",
     "present_memory_add_proposal",
     "present_memory_add_result",

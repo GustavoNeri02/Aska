@@ -8,6 +8,7 @@ from packages.conversation import (
     ModelRole,
     OpenWorkspaceLocationProposal,
     ReplyDecision,
+    RunProjectTestsProposal,
 )
 from tests.cli_support import FakeProvider, create_temp_memory_service
 
@@ -27,6 +28,8 @@ def test_decide_returns_reply_and_records_clean_conversation_history(
     assert "sabe o Explorer?" in provider.messages[0][0].content
     assert '{"type":"reply"' in provider.messages[0][0].content
     assert "pedido explícito para a ação acontecer agora" in provider.messages[0][0].content
+    assert "rode o primeiro teste do projeto" in provider.messages[0][0].content
+    assert "só pode executar a suíte inteira" in provider.messages[0][0].content
     assert provider.messages[0][-1].content == "Como você está?"
 
 
@@ -44,6 +47,18 @@ def test_decide_returns_proposal_without_recording_execution_as_history(
     assert decision == OpenWorkspaceLocationProposal("docs")
     assert service.history == []
     assert len(provider.messages) == 1
+
+
+def test_decide_returns_fixed_project_tests_proposal(tmp_path: Path) -> None:
+    provider = FakeProvider(
+        '{"type":"capability_proposal","action":"run_project_tests"}'
+    )
+    service = ConversationService(provider, create_temp_memory_service(tmp_path))
+
+    decision = service.decide("Rode os testes do projeto.")
+
+    assert decision == RunProjectTestsProposal()
+    assert service.history == []
 
 
 def test_decide_receives_existing_history_and_memories(tmp_path: Path) -> None:
@@ -67,6 +82,26 @@ def test_decide_receives_existing_history_and_memories(tmp_path: Path) -> None:
         ModelRole.USER,
     ]
     assert request[-1].content == "Abra ela para mim."
+
+
+def test_external_result_is_available_to_next_context(tmp_path: Path) -> None:
+    provider = FakeProvider('{"type":"reply","content":"Foram 504 testes."}')
+    service = ConversationService(provider, create_temp_memory_service(tmp_path))
+    service.record_external_result(
+        "Rode os testes do projeto.",
+        "Testes concluídos com sucesso.\nExit code: 0\n504 passed",
+    )
+
+    service.decide("O que me retornou?")
+
+    request = provider.messages[0]
+    assert [message.role for message in request[1:]] == [
+        ModelRole.USER,
+        ModelRole.ASSISTANT,
+        ModelRole.USER,
+    ]
+    assert request[1].content == "Rode os testes do projeto."
+    assert "504 passed" in request[2].content
 
 
 @pytest.mark.parametrize(

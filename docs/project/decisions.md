@@ -90,6 +90,12 @@ A primeira ação no computador abre somente uma pasta existente e confinada a `
 
 O CLI apresenta aplicativo e pasta exatos antes de aceitar `sim`; cancelamento e respostas ambíguas permanecem locais. O parser textual de confirmação é compartilhado com os fluxos de memória, mas estados, políticas e efeitos continuam em handlers específicos. O envelope é extensível por uniões tipadas explícitas, não por descoberta dinâmica: não foi introduzido registry, planner, manifesto ou executor genérico. Somente replies reais entram automaticamente no histórico; proposals não são registradas como ações concluídas. Abertura arbitrária de aplicativos ou arquivos, comandos, shell, mouse, teclado, navegador e interação desktop geral continuam `planned`.
 
+### Testes do projeto como operação executável fixa — `implemented`
+
+A primeira execução de processo não oferece terminal genérico. O catálogo aceita somente `run_project_tests`, uma proposal sem subconjunto, comando, argumentos, caminho ou timeout. Ela representa exclusivamente a suíte inteira; um pedido por primeiro teste, arquivo, nome ou opção deve resultar em reply explicando a limitação, não em ampliação silenciosa de escopo. A implementação local fixa `python -m pytest -q`, usa o interpretador resolvido do ambiente do Aska, restringe o cwd à raiz configurada do workspace, revalida seu snapshot depois da confirmação e executa argv separado com `shell=False`. Timeout, falha de inicialização, exit code, stdout, stderr e truncamento são resultados do sistema, nunca afirmações do modelo. O resultado ou cancelamento é anexado ao histórico como turno externo real para sustentar follow-ups; a proposal isolada não é registrada como execução.
+
+Mesmo sendo uma operação de inspeção de qualidade, Pytest executa código pertencente ao workspace e pode produzir efeitos definidos pelos testes. Por isso a operação exige confirmação explícita e apresenta comando, diretório e timeout antes de rodar. Argumentos fornecidos pelo usuário, seleção de executável, variáveis de ambiente controladas pelo modelo, composição de shell e outras operações de terminal continuam `planned` ou `rejected` até receberem política própria.
+
 ## Decisões substituídas, rejeitadas ou adiadas
 
 - Automação como núcleo — `superseded` por conversa e IA pessoal como núcleo.

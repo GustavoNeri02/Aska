@@ -10,6 +10,7 @@ from apps.cli.handlers import (
     NaturalFileSearchHandler,
     NaturalMemoryHandler,
     NaturalOpenLocationHandler,
+    NaturalProjectTestsHandler,
     handle_memory_command,
 )
 from apps.cli.loading import run_with_loading
@@ -19,6 +20,7 @@ from capabilities.filesystem import (
     ReadTextFileCapability,
     SearchTextCapability,
 )
+from capabilities.terminal import PythonProjectTestRunner, RunProjectTestsCapability
 from packages.conversation import (
     ConversationDecisionError,
     ConversationService,
@@ -31,6 +33,7 @@ from packages.conversation import (
     ModelTextSearchIntentInterpreter,
     OpenWorkspaceLocationProposal,
     ReplyDecision,
+    RunProjectTestsProposal,
     TextSearchIntentInterpreter,
 )
 from packages.inference import OllamaProvider
@@ -61,6 +64,7 @@ def run_conversation_loop(
     file_searcher: SearchTextCapability | None = None,
     text_search_intent_interpreter: TextSearchIntentInterpreter | None = None,
     open_location_capability: OpenWorkspaceLocationCapability | None = None,
+    project_tests_capability: RunProjectTestsCapability | None = None,
     input_reader: Callable[[str], str] = input,
     output_writer: Callable[[str], None] = print,
 ) -> None:
@@ -105,6 +109,15 @@ def run_conversation_loop(
         if open_location_capability is not None
         else None
     )
+    natural_project_tests_handler = (
+        NaturalProjectTestsHandler(
+            project_tests_capability,
+            conversation_service,
+            output_writer,
+        )
+        if project_tests_capability is not None
+        else None
+    )
 
     while True:
         try:
@@ -129,6 +142,8 @@ def run_conversation_loop(
                 natural_memory_handler.cancel_pending_for_literal_command()
                 if natural_open_location_handler is not None:
                     natural_open_location_handler.cancel_pending_for_literal_command()
+                if natural_project_tests_handler is not None:
+                    natural_project_tests_handler.cancel_pending_for_literal_command()
                 handle_memory_command(parsed_input, memory_service, output_writer)
             elif isinstance(parsed_input, ChatMessage):
                 if natural_memory_handler.handle(parsed_input.content):
@@ -145,12 +160,30 @@ def run_conversation_loop(
                     natural_open_location_handler.handle(parsed_input.content)
                 ):
                     continue
-                if natural_open_location_handler is not None:
+                if natural_project_tests_handler is not None and (
+                    natural_project_tests_handler.handle(parsed_input.content)
+                ):
+                    continue
+                if (
+                    natural_open_location_handler is not None
+                    or natural_project_tests_handler is not None
+                ):
                     decision = conversation_service.decide(parsed_input.content)
                     if isinstance(decision, ReplyDecision):
                         output_writer(f"Aska > {decision.content}")
                     elif isinstance(decision, OpenWorkspaceLocationProposal):
-                        natural_open_location_handler.handle_proposal(decision)
+                        if natural_open_location_handler is not None:
+                            natural_open_location_handler.handle_proposal(decision)
+                        else:
+                            output_writer("Aska > A capability solicitada não está disponível.")
+                    elif isinstance(decision, RunProjectTestsProposal):
+                        if natural_project_tests_handler is not None:
+                            natural_project_tests_handler.handle_proposal(
+                                decision,
+                                parsed_input.content,
+                            )
+                        else:
+                            output_writer("Aska > A capability solicitada não está disponível.")
                     continue
                 response = conversation_service.send(parsed_input.content)
                 output_writer(f"Aska > {response}")
@@ -182,6 +215,13 @@ def main() -> None:
         )
     except ValueError:
         open_location_capability = None
+    try:
+        project_tests_capability = RunProjectTestsCapability(
+            workspace_root,
+            PythonProjectTestRunner(),
+        )
+    except ValueError:
+        project_tests_capability = None
 
     model = os.getenv("ASKA_MODEL", "gemma3:12b")
     model_provider = OllamaProvider(
@@ -211,6 +251,7 @@ def main() -> None:
             file_searcher=file_searcher,
             text_search_intent_interpreter=text_search_intent_interpreter,
             open_location_capability=open_location_capability,
+            project_tests_capability=project_tests_capability,
         )
     finally:
         with suppress(ModelProviderError):

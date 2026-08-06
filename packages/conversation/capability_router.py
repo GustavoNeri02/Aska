@@ -10,9 +10,13 @@ CONVERSATION_DECISION_INSTRUCTION = "\n".join(
         '{"type":"reply","content":"sua resposta ao usuário"}',
         '{"type":"capability_proposal","action":"open_workspace_location",'
         '"path":"docs"}',
+        '{"type":"capability_proposal","action":"run_project_tests"}',
         "Capability disponível:",
         "- open_workspace_location: abre uma pasta relativa do workspace no Explorador "
         "de Arquivos. Use path='.' quando o pedido for apenas abrir o Explorador.",
+        "- run_project_tests: executa a operação fixa python -m pytest -q na raiz do "
+        "workspace e sempre roda a suíte inteira. Não aceita subconjunto, arquivo, nome "
+        "de teste, comando, caminho, opção ou argumento do usuário.",
         "Entenda paráfrases usando o histórico e as memórias disponíveis.",
         "Escolha capability_proposal somente quando houver um pedido explícito para a "
         "ação acontecer agora. Mencionar uma capability ou perguntar sobre ela não é "
@@ -32,6 +36,12 @@ CONVERSATION_DECISION_INSTRUCTION = "\n".join(
         '"content":"Depende do caminho escolhido pelo usuário."}',
         'Entrada: abra o Explorer. Saída: {"type":"capability_proposal",'
         '"action":"open_workspace_location","path":"."}',
+        'Entrada: rode os testes do projeto. Saída: {"type":"capability_proposal",'
+        '"action":"run_project_tests"}',
+        'Entrada: rode o primeiro teste do projeto. Saída: {"type":"reply",'
+        '"content":"A capability atual só pode executar a suíte inteira."}',
+        'Entrada: rode tests/test_app.py. Saída: {"type":"reply",'
+        '"content":"A capability atual não aceita arquivo ou subconjunto de testes."}',
     )
 )
 
@@ -41,7 +51,12 @@ class OpenWorkspaceLocationProposal:
     path: str
 
 
-CapabilityProposal = OpenWorkspaceLocationProposal
+@dataclass(frozen=True, slots=True)
+class RunProjectTestsProposal:
+    pass
+
+
+CapabilityProposal = OpenWorkspaceLocationProposal | RunProjectTestsProposal
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +101,11 @@ def parse_conversation_decision(response: str) -> ConversationDecision:
         if path is None:
             raise ConversationDecisionError("proposal path must be valid text")
         return OpenWorkspaceLocationProposal(path)
+    if data == {
+        "type": "capability_proposal",
+        "action": "run_project_tests",
+    }:
+        return RunProjectTestsProposal()
     raise ConversationDecisionError("unknown conversation decision")
 
 

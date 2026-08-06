@@ -11,6 +11,7 @@ from capabilities.filesystem import (
     ReadTextFileCapability,
     SearchTextCapability,
 )
+from capabilities.terminal import RunProjectTestsCapability
 from packages.conversation import ModelProviderError
 
 
@@ -125,6 +126,7 @@ def test_main_configures_file_reader_with_allowed_workspace(
         configured["open_location_capability"],
         OpenWorkspaceLocationCapability,
     )
+    assert isinstance(configured["project_tests_capability"], RunProjectTestsCapability)
 
 
 @pytest.mark.parametrize("workspace_kind", ["missing", "file"])
