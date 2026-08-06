@@ -46,8 +46,9 @@ Esses tipos descrevem a direção arquitetural, não componentes já implementad
 - A exclusão natural aceita padrões completos como `esqueça que`, `remova a memória:` e `apague a memória:` ou paráfrases que passem por um gate específico e produzam JSON estrito. O modelo fornece somente uma query e não recebe IDs ou a lista de memórias. A seleção local tenta primeiro igualdade sem distinção de caixa e depois a pesquisa textual existente; exatamente uma candidata gera `PendingMemoryDelete`. Após confirmação, `MemoryService.delete_by_id()` valida ID e snapshot antes de persistir.
 - A edição natural usa ID estável e snapshot do conteúdo esperado. ID inválido, memória ausente, conteúdo divergente ou duplicado não são persistidos. Comandos literais de memória continuam disponíveis e cancelam uma proposta pendente antes de executar.
 - A prevenção de duplicatas compara uma chave privada com `strip`, Unicode NFKC, espaços consecutivos colapsados, `casefold` e remoção de um único ponto terminal. O conteúdo original continua sendo persistido sem essa normalização, e a equivalência não impede editar apenas a capitalização ou formatação da própria memória.
-- Em cada interação conversacional, `ConversationService` consulta as memórias persistidas pelo contrato `MemoryReader` e delega ao `ContextBuilder` a inclusão do conteúdo na mensagem `system`, junto da identidade estável do Aska. O histórico da sessão segue em mensagens separadas com papéis `user` e `assistant`, inclusive quando as memórias vêm de execuções anteriores. No CLI, `app.py` mantém o loop, o despacho de alto nível e o composition root; `NaturalMemoryHandler` coordena detecção, interpretação, seleção, confirmação e apresentação dos fluxos naturais específicos da interface.
+- Em cada interação conversacional, `ConversationService` consulta `TextMemoryRetriever`, que seleciona localmente até cinco memórias por sobreposição de termos normalizados entre a mensagem atual, até dois turnos recentes e o conteúdo persistido. `ContextBuilder` inclui somente essa seleção na mensagem `system`, junto da identidade estável do Aska. Empates preservam a ordem do repositório; ausência de correspondência não envia memórias. O histórico da sessão segue em mensagens separadas com papéis `user` e `assistant`. No CLI, `app.py` mantém o loop, o despacho de alto nível e o composition root; `NaturalMemoryHandler` coordena detecção, interpretação, confirmação e persistência dos fluxos naturais específicos da interface.
 - Das memórias, somente `content` é enviado ao modelo; IDs e metadados permanecem locais por padrão.
+- `ConversationService` conserva em memória somente a seleção usada na última resposta visível. Perguntas explícitas como “quais memórias você usou?” reutilizam exatamente essa seleção no contexto do turno seguinte, permitindo transparência sem expor IDs ou executar uma nova busca.
 
 ## Transparência e controle
 
@@ -55,11 +56,12 @@ O usuário deve poder listar, pesquisar, editar e excluir memórias, marcá-las 
 
 ## Limitações atuais e evoluções planejadas
 
-- Todas as memórias salvas são enviadas em todas as requisições ao modelo; não há seleção por relevância.
+- A seleção implementada é lexical e determinística; ainda não reconhece sinônimos, equivalência semântica ou relações implícitas sem termos compartilhados.
+- Quando nenhuma memória relevante é selecionada, a identidade instrui explicitamente o modelo a não inventar preferências, experiências ou fatos pessoais e a admitir que não sabe.
 - O conteúdo das memórias ainda é serializado como uma lista textual dentro da mensagem `system`; a estrutura e os metadados persistidos não são expostos ao modelo.
 - A prevenção de duplicatas cobre equivalência textual superficial, não equivalência semântica nem detecção de contradições; essas evoluções permanecem `planned`.
 - Tipos de memória e `subjects` estruturados permanecem `planned`.
-- Seleção por relevância, orçamento de contexto e compactação permanecem `planned`.
+- Um limite simples de cinco resultados está implementado; orçamento por tokens, pesos por tipo, compactação e relevância semântica permanecem `planned`.
 - Temporalidade e captura automática configurável permanecem `planned`.
 - A interpretação por modelo está limitada às propostas de alteração do nome e criação, edição ou exclusão explícita de uma memória, sem tool calling. JSON inválido, campos ou ações desconhecidos e conteúdo vazio são rejeitados sem produzir proposta. Captura automática e ações de memória mais amplas permanecem `planned`.
 - A interface atual é o CLI, mas detecção e representação da proposta não dependem dele e poderão ser reutilizadas por voz no futuro.

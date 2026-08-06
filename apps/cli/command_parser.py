@@ -11,12 +11,18 @@ from apps.cli.commands import (
 )
 
 EXIT_COMMANDS = frozenset({"sair", "exit", "quit"})
+CLEAR_COMMANDS = frozenset({"clear", "/clear", "cls", "/cls"})
 
 
 def parse_input(user_input: str) -> ParsedInput:
     normalized_message = user_input.casefold()
     if normalized_message in EXIT_COMMANDS:
         return ExitCommand()
+    if normalized_message in CLEAR_COMMANDS:
+        return InvalidCommand(
+            "Limpar a tela ou o histórico ainda não está disponível; "
+            "essas ações terão comandos separados."
+        )
     if normalized_message == "memórias":
         return ListMemoriesCommand()
     if normalized_message.startswith("lembrar:"):

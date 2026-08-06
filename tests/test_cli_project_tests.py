@@ -93,8 +93,11 @@ def test_confirmation_and_original_request_are_preserved_in_history(tmp_path: Pa
     provider = SequencedProvider(
         [
             '{"type":"capability_proposal","action":"run_project_tests"}',
-            '{"type":"reply","content":"Posso rodar a suíte inteira. Confirma?"}',
-            '{"type":"event_reply","acknowledged_status":"success",'
+            '{"type":"event_reply","acknowledged_domain":"project_tests",'
+            '"acknowledged_kind":"confirmation_required",'
+            '"content":"Posso rodar a suíte inteira. Confirma?"}',
+            '{"type":"event_reply","acknowledged_domain":"project_tests",'
+            '"acknowledged_kind":"completed","acknowledged_status":"success",'
             '"content":"A suíte terminou: 504 passaram."}',
             '{"type":"reply","content":"Os 504 testes passaram."}',
         ]

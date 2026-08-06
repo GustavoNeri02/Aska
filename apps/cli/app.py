@@ -46,6 +46,7 @@ from packages.conversation import (
     RunProjectTestsProposal,
     TextSearchIntentInterpreter,
     detect_explicit_project_lint,
+    is_memory_usage_question,
 )
 from packages.inference import OllamaProvider
 from packages.memory import (
@@ -176,6 +177,10 @@ def run_conversation_loop(
                     output_writer,
                 )
             elif isinstance(parsed_input, ChatMessage):
+                if is_memory_usage_question(parsed_input.content):
+                    response = conversation_service.present_memory_usage(parsed_input.content)
+                    output_writer(f"Aska > {response}")
+                    continue
                 if (
                     handler_result := natural_memory_handler.handle(parsed_input.content)
                 ) is not None:

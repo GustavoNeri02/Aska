@@ -16,6 +16,7 @@ from packages.conversation import (
     detect_explicit_file_location,
     detect_explicit_file_read,
     detect_known_document_query,
+    detect_known_memory_file_location,
     should_interpret_file_read,
 )
 
@@ -37,6 +38,8 @@ class NaturalFileReadHandler:
             intent = detect_explicit_file_location(user_input)
         if intent is None:
             intent = detect_known_document_query(user_input)
+        if intent is None:
+            intent = detect_known_memory_file_location(user_input)
         if intent is None:
             if not should_interpret_file_read(user_input):
                 return None

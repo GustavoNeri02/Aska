@@ -18,10 +18,11 @@ from packages.memory import JsonMemoryDataSource, LocalMemoryRepository, MemoryS
 class RecordingProvider:
     def __init__(self) -> None:
         self.requests: list[list[ModelMessage]] = []
+        self.response = "resposta"
 
     def generate(self, messages: Sequence[ModelMessage]) -> str:
         self.requests.append(list(messages))
-        return "resposta"
+        return self.response
 
 
 class FailingProvider:
@@ -81,13 +82,60 @@ def test_memories_add_only_content_to_system_context(tmp_path: Path) -> None:
     assert memory is not None
     conversation = ConversationService(provider, memory_service)
 
-    conversation.send("Olá")
+    conversation.send("Qual linguagem eu gosto?")
 
     system_content = provider.requests[0][0].content
     assert "Memórias sobre Gustavo:\n- gosto de Python" in system_content
     assert memory.id not in system_content
     assert memory.source.value not in system_content
     assert memory.created_at.isoformat() not in system_content
+
+
+def test_unrelated_memories_are_not_added_to_context(tmp_path: Path) -> None:
+    provider = RecordingProvider()
+    memory_service = create_memory_service(tmp_path)
+    memory_service.add("gosto de Python")
+    conversation = ConversationService(provider, memory_service)
+
+    conversation.send("Como está o tempo?")
+
+    assert "Memórias sobre Gustavo:" not in provider.requests[0][0].content
+    assert "Nunca invente preferências" in provider.requests[0][0].content
+    assert "diga que não sabe" in provider.requests[0][0].content
+
+
+def test_user_can_ask_which_memories_were_used(tmp_path: Path) -> None:
+    provider = RecordingProvider()
+    memory_service = create_memory_service(tmp_path)
+    relevant = memory_service.add("gosto de Python").memory
+    memory_service.add("trabalho com Flutter")
+    assert relevant is not None
+    conversation = ConversationService(provider, memory_service)
+
+    conversation.send("Qual linguagem eu gosto?")
+    conversation.send("Quais memórias você usou?")
+
+    assert conversation.last_used_memories == (relevant,)
+    assert "- gosto de Python" in provider.requests[1][0].content
+    assert "trabalho com Flutter" not in provider.requests[1][0].content
+
+
+def test_memory_usage_report_exposes_exact_last_selection(tmp_path: Path) -> None:
+    provider = RecordingProvider()
+    memory_service = create_memory_service(tmp_path)
+    memory_service.add("gosto de Python")
+    conversation = ConversationService(provider, memory_service)
+    conversation.send("Qual linguagem eu gosto?")
+    provider.response = (
+        '{"type":"event_reply","acknowledged_domain":"memory",'
+        '"acknowledged_kind":"memory_usage_report",'
+        '"content":"Usei a memória: gosto de Python."}'
+    )
+
+    response = conversation.present_memory_usage("Quais memórias você usou?")
+
+    assert response == "Usei a memória: gosto de Python."
+    assert '"memories": ["gosto de Python"]' in provider.requests[1][-1].content
 
 
 def test_absent_memories_do_not_add_empty_context(tmp_path: Path) -> None:

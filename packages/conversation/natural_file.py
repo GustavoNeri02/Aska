@@ -55,6 +55,11 @@ _KNOWN_DOCUMENT_PATHS = {
     "decisões": "decisions.md",
     "decisoes": "decisions.md",
 }
+_KNOWN_MEMORY_FILE_LOCATION = re.compile(
+    r"\b(?:arquivo|ficheiro)\b.*\bmem[oó]ria(?:s)?\b|"
+    r"\bmem[oó]ria(?:s)?\b.*\b(?:arquivo|ficheiro)\b",
+    re.IGNORECASE,
+)
 _INTERPRETER_INSTRUCTION = "\n".join(
     (
         "Apenas classifique o pedido. Não responda ao usuário, não leia arquivos "
@@ -151,6 +156,15 @@ def detect_explicit_file_location(user_input: str) -> ListFilesIntent | None:
     if match is None or "/" in match.group(0) or "\\" in match.group(0):
         return None
     return ListFilesIntent(name_contains=match.group(0))
+
+
+def detect_known_memory_file_location(user_input: str) -> ListFilesIntent | None:
+    message = user_input.strip()
+    if not message or "\n" in message or "\r" in message:
+        return None
+    if _KNOWN_MEMORY_FILE_LOCATION.search(message) is None:
+        return None
+    return ListFilesIntent(name_contains="memories.json", extension=".json")
 
 
 def detect_known_document_query(user_input: str) -> ReadTextFileIntent | None:

@@ -10,6 +10,11 @@ from packages.conversation.capability_router import (
 from packages.conversation.context import ContextBuilder
 from packages.conversation.external_event import ConversationEvent
 from packages.conversation.identity import ASKA_IDENTITY
+from packages.conversation.memory_retrieval import (
+    MemorySelection,
+    TextMemoryRetriever,
+    is_memory_usage_question,
+)
 from packages.conversation.model import (
     ContextDocument,
     ConversationTurn,
@@ -26,6 +31,7 @@ from packages.conversation.natural_file import (
     detect_explicit_file_location,
     detect_explicit_file_read,
     detect_known_document_query,
+    detect_known_memory_file_location,
     should_interpret_file_read,
 )
 from packages.conversation.natural_memory import (
@@ -82,6 +88,7 @@ __all__ = [
     "ModelMessage",
     "ModelRole",
     "MemoryIntent",
+    "MemorySelection",
     "MemoryIntentInterpreter",
     "ModelMemoryIntentInterpreter",
     "ModelTextSearchIntentInterpreter",
@@ -97,6 +104,7 @@ __all__ = [
     "ReadTextFileIntent",
     "SearchTextIntent",
     "TextSearchIntentInterpreter",
+    "TextMemoryRetriever",
     "canonical_name_memory",
     "detect_memory_add",
     "detect_memory_delete",
@@ -107,7 +115,9 @@ __all__ = [
     "detect_explicit_open_location",
     "detect_explicit_project_lint",
     "detect_known_document_query",
+    "detect_known_memory_file_location",
     "find_name_memory_candidates",
+    "is_memory_usage_question",
     "should_interpret_memory_add",
     "should_interpret_memory_delete",
     "should_interpret_memory_edit",

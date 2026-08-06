@@ -117,7 +117,8 @@ def test_external_event_is_presented_by_model_and_recorded_as_aska_reply(
     tmp_path: Path,
 ) -> None:
     provider = FakeProvider(
-        '{"type":"event_reply","acknowledged_status":"success",'
+        '{"type":"event_reply","acknowledged_domain":"project_tests",'
+        '"acknowledged_kind":"completed","acknowledged_status":"success",'
         '"content":"Tudo certo: os 507 testes passaram."}'
     )
     service = ConversationService(provider, create_temp_memory_service(tmp_path))
@@ -139,7 +140,9 @@ def test_external_event_is_presented_by_model_and_recorded_as_aska_reply(
 
 def test_executable_event_rejects_model_that_changes_status(tmp_path: Path) -> None:
     provider = FakeProvider(
-        '{"type":"event_reply","acknowledged_status":"success","content":"O Ruff passou."}'
+        '{"type":"event_reply","acknowledged_domain":"project_lint",'
+        '"acknowledged_kind":"completed","acknowledged_status":"success",'
+        '"content":"O Ruff passou."}'
     )
     service = ConversationService(provider, create_temp_memory_service(tmp_path))
 
@@ -182,7 +185,9 @@ def test_external_event_retries_capability_proposal_instead_of_exposing_error(
     provider = SequencedProvider(
         [
             '{"type":"capability_proposal","action":"run_project_lint"}',
-            '{"type":"reply","content":"Posso rodar o Ruff. Você confirma?"}',
+            '{"type":"event_reply","acknowledged_domain":"project_lint",'
+            '"acknowledged_kind":"confirmation_required",'
+            '"content":"Posso rodar o Ruff. Você confirma?"}',
         ]
     )
     service = ConversationService(provider, create_temp_memory_service(tmp_path))
@@ -204,7 +209,7 @@ def test_external_event_retries_capability_proposal_instead_of_exposing_error(
 
 def test_decide_receives_existing_history_and_memories(tmp_path: Path) -> None:
     memory_service = create_temp_memory_service(tmp_path)
-    memory_service.add("O projeto atual é o Aska")
+    memory_service.add("A documentação do Aska fica em docs")
     provider = FakeProvider("Resposta inicial")
     service = ConversationService(provider, memory_service)
     service.send("Estamos falando de docs", context_document=None)
@@ -215,7 +220,7 @@ def test_decide_receives_existing_history_and_memories(tmp_path: Path) -> None:
     service.decide("Abra ela para mim.")
 
     request = provider.messages[1]
-    assert "O projeto atual é o Aska" in request[0].content
+    assert "A documentação do Aska fica em docs" in request[0].content
     assert [message.role for message in request[1:]] == [
         ModelRole.USER,
         ModelRole.ASSISTANT,

@@ -10,6 +10,7 @@ from packages.conversation import (
     detect_explicit_file_location,
     detect_explicit_file_read,
     detect_known_document_query,
+    detect_known_memory_file_location,
     should_interpret_file_read,
 )
 
@@ -121,6 +122,21 @@ def test_file_gate_accepts_clear_file_location_request() -> None:
 def test_explicit_file_location_is_detected_deterministically() -> None:
     assert detect_explicit_file_location("Onde está o arquivo memory.json?") == ListFilesIntent(
         name_contains="memory.json"
+    )
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Algum arquivo de memória aqui do projeto?",
+        "Onde fica o arquivo das memórias?",
+        "Existe um ficheiro de memoria?",
+    ],
+)
+def test_known_memory_file_location_is_detected_deterministically(message: str) -> None:
+    assert detect_known_memory_file_location(message) == ListFilesIntent(
+        name_contains="memories.json",
+        extension=".json",
     )
 
 

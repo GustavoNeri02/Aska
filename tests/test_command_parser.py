@@ -32,6 +32,14 @@ def test_parser_marks_malformed_edit_command() -> None:
     )
 
 
+@pytest.mark.parametrize("value", ["clear", "/clear", "cls", "/cls"])
+def test_parser_reports_clear_as_not_yet_defined(value: str) -> None:
+    assert parse_input(value) == InvalidCommand(
+        "Limpar a tela ou o histórico ainda não está disponível; "
+        "essas ações terão comandos separados."
+    )
+
+
 @pytest.mark.parametrize(
     ("user_input", "usage"),
     [

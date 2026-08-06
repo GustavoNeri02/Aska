@@ -1,13 +1,24 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 from apps.cli.app import run_conversation_loop
-from packages.conversation import AddMemoryIntent, EditMemoryIntent
+from packages.conversation import AddMemoryIntent, EditMemoryIntent, ModelMessage
 from tests.cli_support import (
     FakeMemoryIntentInterpreter,
     FakeProvider,
     create_input_reader,
     create_temp_memory_service,
 )
+
+
+class SequencedProvider:
+    def __init__(self, responses: list[str]) -> None:
+        self._responses = iter(responses)
+        self.messages: list[list[ModelMessage]] = []
+
+    def generate(self, messages: Sequence[ModelMessage]) -> str:
+        self.messages.append(list(messages))
+        return next(self._responses)
 
 
 def test_literal_memory_result_is_presented_by_model(tmp_path: Path) -> None:
@@ -45,7 +56,13 @@ def test_memory_listing_is_sent_as_structured_facts(tmp_path: Path) -> None:
 def test_natural_add_requires_confirmation_and_executes_once(tmp_path: Path) -> None:
     service = create_temp_memory_service(tmp_path)
     interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Uso Flutter"))
-    provider = FakeProvider('{"type":"reply","content":"Tudo certo."}')
+    provider = SequencedProvider(
+        [
+            '{"type":"event_reply","acknowledged_domain":"memory",'
+            '"acknowledged_kind":"confirmation_required","content":"Confirma?"}',
+            '{"type":"reply","content":"Tudo certo."}',
+        ]
+    )
 
     run_conversation_loop(
         provider,
@@ -64,7 +81,13 @@ def test_natural_add_requires_confirmation_and_executes_once(tmp_path: Path) -> 
 def test_natural_memory_cancellation_has_no_effect(tmp_path: Path) -> None:
     service = create_temp_memory_service(tmp_path)
     interpreter = FakeMemoryIntentInterpreter(AddMemoryIntent("Uso Flutter"))
-    provider = FakeProvider('{"type":"reply","content":"Cancelei."}')
+    provider = SequencedProvider(
+        [
+            '{"type":"event_reply","acknowledged_domain":"memory",'
+            '"acknowledged_kind":"confirmation_required","content":"Confirma?"}',
+            '{"type":"reply","content":"Cancelei."}',
+        ]
+    )
 
     run_conversation_loop(
         provider,
@@ -83,7 +106,13 @@ def test_memory_edit_snapshot_conflict_is_reported_as_fact(tmp_path: Path) -> No
     original = service.add("Uso Flutter").memory
     assert original is not None
     interpreter = FakeMemoryIntentInterpreter(EditMemoryIntent("Flutter", "Uso Python"))
-    provider = FakeProvider('{"type":"reply","content":"A memória mudou."}')
+    provider = SequencedProvider(
+        [
+            '{"type":"event_reply","acknowledged_domain":"memory",'
+            '"acknowledged_kind":"confirmation_required","content":"Confirma?"}',
+            '{"type":"reply","content":"A memória mudou."}',
+        ]
+    )
     messages = iter(["Atualize a memória", "sim", "sair"])
 
     def input_reader(_: str) -> str:

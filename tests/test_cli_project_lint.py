@@ -33,7 +33,11 @@ def test_lint_requires_confirmation_and_preserves_request(tmp_path: Path) -> Non
 
 def test_explicit_lint_request_bypasses_model_decision(tmp_path: Path) -> None:
     runner = Runner()
-    provider = FakeProvider('{"type":"reply","content":"Posso executar. Confirma?"}')
+    provider = FakeProvider(
+        '{"type":"event_reply","acknowledged_domain":"project_lint",'
+        '"acknowledged_kind":"confirmation_required",'
+        '"content":"Posso executar. Confirma?"}'
+    )
 
     run_conversation_loop(
         provider,

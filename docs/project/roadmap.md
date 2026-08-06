@@ -41,6 +41,8 @@
 - A execução confirmada da suíte inteira de testes está `implemented` como action sem parâmetros controlados pelo modelo. O comando fixo é `python -m pytest -q`, com workspace revalidado, `shell=False`, timeout, saída limitada e resultado real tipado. Subconjuntos não são ampliados para a suíte inteira; alternativas usam `offer` tipada, e execução ou cancelamento geram evento autoritativo apresentado pela IA e preservado para follow-ups. O checkup manual desta correção está pendente.
 - A verificação confirmada de lint está `implemented` como operação fixa `python -m ruff check .`, sem caminhos, opções ou correção automática controlados pelo modelo. Ela reutiliza o runner seguro de módulo Python, preservando proposal tipada, confirmação, snapshot, timeout, saída limitada e resultado autoritativo próprios. O pedido explícito usa fast path determinístico e decisões conversacionais inválidas recebem uma única tentativa corretiva. O checkup manual deve ser repetido após essa correção.
 - A voz única está `implemented` no CLI de produção: handlers de memória, filesystem, busca, desktop e terminal retornam `HandlerResult` estruturado, sem `output_writer`, frases prontas ou dependência da conversa. O app converte esses fatos em eventos e somente a IA gera a apresentação visível. Respostas a propostas pendentes são interpretadas pelo modelo em decisão fechada (`confirm`, `cancel` ou `unknown`), enquanto estado, política, revalidação e efeito permanecem locais. Somente falhas que impedem o modelo de responder usam o prefixo técnico `Erro`. O checkup manual está pendente.
+- Recuperação seletiva de memória está `implemented` com ranking lexical local, limite de cinco resultados, mensagem atual e até dois turnos recentes. Somente conteúdos selecionados entram no contexto; a seleção da última resposta pode ser consultada naturalmente pelo usuário. Relevância semântica e orçamento por tokens continuam `planned`.
+- Apresentações sensíveis reconhecem domínio e tipo em envelope fechado; `confirmation_required` deve pedir confirmação sem afirmar conclusão. A localização descritiva do arquivo de memórias usa descoberta determinística. `clear`, `/clear` e `cls` são reconhecidos como indisponíveis até tela e histórico receberem comandos com semânticas separadas. O checkup manual de recuperação seletiva, transparência, confirmação e descoberta do arquivo de memória foi concluído com sucesso.
 
 ### Comportamento atual
 
@@ -69,7 +71,7 @@ Persistent Memory usa objetos com `id`, `content`, `source`, `created_at` e `upd
 
 - A prevenção atual reconhece equivalência textual, não equivalência de significado; equivalência semântica e detecção de contradições permanecem `planned`.
 - Tipos de memória e `subjects` estruturados permanecem `planned`.
-- Seleção por relevância, orçamento de contexto e compactação permanecem `planned`; atualmente todas as memórias são enviadas ao modelo.
+- Seleção lexical limitada está `implemented`; orçamento por tokens, relevância semântica e compactação permanecem `planned`.
 - Temporalidade e captura automática configurável permanecem `planned`.
 - JSON continua sendo o armazenamento implementado; SQLite será considerado somente quando houver necessidade concreta.
 - Busca vetorial permanece `planned` e só deve ser adotada se uma necessidade de recuperação justificar sua complexidade.
