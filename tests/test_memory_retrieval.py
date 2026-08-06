@@ -55,9 +55,43 @@ def test_retriever_limits_results() -> None:
     ]
 
 
+def test_retriever_explains_exact_plural_and_related_matches() -> None:
+    memories = [
+        _memory("1", "Prefiro aplicativos em Flutter"),
+        _memory("2", "Gosto de trabalhar com Dart"),
+    ]
+
+    selection = TextMemoryRetriever(Source(memories)).retrieve(
+        "Quais aplicativo uso para trabalhos?"
+    )
+
+    assert [match.memory.content for match in selection.matches] == [
+        "Prefiro aplicativos em Flutter",
+        "Gosto de trabalhar com Dart",
+    ]
+    assert selection.matches[0].matched_terms == ("aplicativo",)
+    assert selection.matches[0].match_kinds == ("plural",)
+    assert selection.matches[0].score == 2
+    assert selection.matches[1].matched_terms == ("trabalhos",)
+    assert selection.matches[1].match_kinds == ("related",)
+    assert selection.matches[1].score == 1
+
+
+def test_retriever_does_not_use_short_or_distant_prefixes() -> None:
+    retriever = TextMemoryRetriever(Source([_memory("1", "Uso cartão diariamente")]))
+
+    assert retriever.retrieve("Gosto de carros").memories == ()
+
+
 @pytest.mark.parametrize(
     "message",
-    ["Quais memórias você usou?", "Que memória foi utilizada?", "Memórias consideradas"],
+    [
+        "Quais memórias você usou?",
+        "Que memória foi utilizada?",
+        "Memórias consideradas",
+        "Por que você usou essa memória?",
+        "Qual o motivo dessa memória?",
+    ],
 )
 def test_detects_memory_usage_questions(message: str) -> None:
     assert is_memory_usage_question(message) is True

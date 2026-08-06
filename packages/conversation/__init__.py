@@ -11,6 +11,7 @@ from packages.conversation.context import ContextBuilder
 from packages.conversation.external_event import ConversationEvent
 from packages.conversation.identity import ASKA_IDENTITY
 from packages.conversation.memory_retrieval import (
+    MemoryMatch,
     MemorySelection,
     TextMemoryRetriever,
     is_memory_usage_question,
@@ -88,6 +89,7 @@ __all__ = [
     "ModelMessage",
     "ModelRole",
     "MemoryIntent",
+    "MemoryMatch",
     "MemorySelection",
     "MemoryIntentInterpreter",
     "ModelMemoryIntentInterpreter",

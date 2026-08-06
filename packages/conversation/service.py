@@ -47,7 +47,7 @@ class ConversationService:
         self._memory_retriever = memory_retriever or TextMemoryRetriever(memory_reader)
         self._history: list[ConversationTurn] = []
         self._pending_offer: CapabilityProposal | None = None
-        self._last_used_memories: tuple[Memory, ...] = ()
+        self._last_memory_selection = MemorySelection((), ())
 
     @property
     def history(self) -> list[ConversationTurn]:
@@ -55,14 +55,19 @@ class ConversationService:
 
     @property
     def last_used_memories(self) -> tuple[Memory, ...]:
-        return self._last_used_memories
+        return self._last_memory_selection.memories
+
+    @property
+    def last_memory_selection(self) -> MemorySelection:
+        return self._last_memory_selection
 
     def send(
         self,
         user_message: str,
         context_document: ContextDocument | None = None,
     ) -> str:
-        memories = self._select_memories(user_message)
+        selection = self._select_memories(user_message)
+        memories = selection.memories
         messages = self._context_builder.build(
             history=self._history,
             user_message=user_message,
@@ -71,11 +76,12 @@ class ConversationService:
         )
         response = self._model_provider.generate(messages)
         self._history.append(ConversationTurn(user_message, response))
-        self._last_used_memories = memories
+        self._last_memory_selection = selection
         return response
 
     def decide(self, user_message: str) -> ConversationDecision:
-        memories = self._select_memories(user_message)
+        selection = self._select_memories(user_message)
+        memories = selection.memories
         decision_instruction = CONVERSATION_DECISION_INSTRUCTION
         pending_offer = self._pending_offer
         if pending_offer is not None:
@@ -120,7 +126,7 @@ class ConversationService:
         if isinstance(decision, ReplyDecision):
             self._history.append(ConversationTurn(user_message, decision.content))
             self._pending_offer = decision.offer
-            self._last_used_memories = memories
+            self._last_memory_selection = selection
         else:
             self._pending_offer = None
         return decision
@@ -132,7 +138,8 @@ class ConversationService:
         original_request: str | None = None,
     ) -> str:
         event_request = original_request or user_message
-        memories = self._select_memories(event_request)
+        selection = self._select_memories(event_request)
+        memories = selection.memories
         status = event.facts.get("status")
         requires_status_ack = (
             event.domain in {"project_tests", "project_lint"}
@@ -163,7 +170,7 @@ class ConversationService:
             elif event.kind == "memory_usage_report":
                 event_instruction = (
                     f"{event_instruction} Responda diretamente listando exatamente as memórias "
-                    "do evento, ou diga que nenhuma foi usada."
+                    "do evento e explique os motivos fornecidos, ou diga que nenhuma foi usada."
                 )
         messages = self._context_builder.build(
             history=self._history,
@@ -200,7 +207,7 @@ class ConversationService:
             )
         )
         self._pending_offer = None
-        self._last_used_memories = memories
+        self._last_memory_selection = selection
         return natural_response
 
     def present_memory_usage(self, user_message: str) -> str:
@@ -209,16 +216,29 @@ class ConversationService:
             ConversationEvent(
                 "memory",
                 "memory_usage_report",
-                {"memories": tuple(memory.content for memory in self._last_used_memories)},
+                {
+                    "memories": tuple(
+                        match.memory.content for match in self._last_memory_selection.matches
+                    ),
+                    "selection_reasons": tuple(
+                        {
+                            "content": match.memory.content,
+                            "score": match.score,
+                            "matched_terms": match.matched_terms,
+                            "match_kinds": match.match_kinds,
+                        }
+                        for match in self._last_memory_selection.matches
+                    ),
+                },
             ),
         )
 
-    def _select_memories(self, user_message: str) -> tuple[Memory, ...]:
+    def _select_memories(self, user_message: str) -> MemorySelection:
         if is_memory_usage_question(user_message):
-            return self._last_used_memories
+            return self._last_memory_selection
         recent_user_messages = [turn.user_message for turn in self._history[-2:]]
         retrieval_query = "\n".join([*recent_user_messages, user_message])
-        return self._memory_retriever.retrieve(retrieval_query).memories
+        return self._memory_retriever.retrieve(retrieval_query)
 
 
 def _parse_event_response(

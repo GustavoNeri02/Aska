@@ -136,6 +136,31 @@ def test_memory_usage_report_exposes_exact_last_selection(tmp_path: Path) -> Non
 
     assert response == "Usei a memória: gosto de Python."
     assert '"memories": ["gosto de Python"]' in provider.requests[1][-1].content
+    assert '"selection_reasons"' in provider.requests[1][-1].content
+    assert '"matched_terms": ["gosto"]' in provider.requests[1][-1].content
+    assert '"match_kinds": ["exact"]' in provider.requests[1][-1].content
+
+
+def test_memory_reason_question_reuses_selection_without_new_retrieval(
+    tmp_path: Path,
+) -> None:
+    provider = RecordingProvider()
+    memory_service = create_memory_service(tmp_path)
+    memory_service.add("Trabalho profissionalmente com Flutter")
+    conversation = ConversationService(provider, memory_service)
+    conversation.send("Com qual tecnologia eu trabalho?")
+    provider.response = (
+        '{"type":"event_reply","acknowledged_domain":"memory",'
+        '"acknowledged_kind":"memory_usage_report",'
+        '"content":"Usei a memória porque trabalho correspondeu exatamente."}'
+    )
+
+    response = conversation.present_memory_usage("Por que você usou essa memória?")
+
+    assert "correspondeu exatamente" in response
+    assert '"content": "Trabalho profissionalmente com Flutter"' in (
+        provider.requests[1][-1].content
+    )
 
 
 def test_absent_memories_do_not_add_empty_context(tmp_path: Path) -> None:
