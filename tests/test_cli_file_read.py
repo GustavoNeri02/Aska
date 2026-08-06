@@ -322,3 +322,34 @@ def test_empty_file_listing_is_reported_locally_without_conversation_provider(
     assert interpreter.inputs == []
     assert provider.messages == []
     assert "Nenhum arquivo correspondente foi encontrado." in output
+
+
+def test_empty_exact_listing_suggests_similar_filename_without_provider(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    memory_file = workspace / "data" / "memory" / "memories.json"
+    memory_file.parent.mkdir(parents=True)
+    memory_file.write_text("conteúdo não deve ser lido", encoding="utf-8")
+    provider = FakeProvider()
+    interpreter = FakeFileIntentInterpreter(None)
+    output: list[str] = []
+    message = "Onde está o arquivo memory.json?"
+
+    run_conversation_loop(
+        provider,
+        memory_service=create_memory_service(tmp_path / "memory-store.json"),
+        file_reader=ReadTextFileCapability(workspace.resolve()),
+        file_lister=ListFilesCapability(workspace.resolve()),
+        file_intent_interpreter=interpreter,
+        input_reader=create_input_reader([message, "sair"]),
+        output_writer=output.append,
+    )
+
+    assert interpreter.inputs == []
+    assert provider.messages == []
+    assert (
+        "Nenhum arquivo com o nome exato foi encontrado.\n"
+        "Você quis dizer?\n"
+        "- data/memory/memories.json"
+    ) in output

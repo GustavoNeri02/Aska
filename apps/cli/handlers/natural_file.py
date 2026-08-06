@@ -6,6 +6,7 @@ from capabilities.filesystem import (
     ListFilesStatus,
     ReadTextFileCapability,
     ReadTextFileStatus,
+    suggest_similar_file_paths,
 )
 from packages.conversation import (
     ContextDocument,
@@ -121,6 +122,14 @@ class NaturalFileReadHandler:
             self._output_writer(_list_error_message(result.status))
             return True
         if not result.paths:
+            suggestions = self._suggest_similar_file_paths(intent)
+            if suggestions:
+                candidates = "\n".join(f"- {path}" for path in suggestions)
+                self._output_writer(
+                    "Nenhum arquivo com o nome exato foi encontrado.\n"
+                    f"Você quis dizer?\n{candidates}"
+                )
+                return True
             self._output_writer("Nenhum arquivo correspondente foi encontrado.")
             return True
 
@@ -133,6 +142,20 @@ class NaturalFileReadHandler:
             content=listing,
         )
         return True
+
+    def _suggest_similar_file_paths(self, intent: ListFilesIntent) -> tuple[str, ...]:
+        if self._file_lister is None or intent.name_contains is None:
+            return ()
+        requested_filename = intent.name_contains.strip()
+        if not _is_bare_filename(requested_filename):
+            return ()
+        extension = PurePosixPath(requested_filename).suffix
+        if not extension:
+            return ()
+        candidates = self._file_lister.list(intent.directory, extension=extension)
+        if candidates.status is not ListFilesStatus.SUCCESS:
+            return ()
+        return suggest_similar_file_paths(requested_filename, candidates.paths)
 
     def _send_with_context(self, user_input: str, *, source: str, content: str) -> None:
         response = self._conversation_service.send(

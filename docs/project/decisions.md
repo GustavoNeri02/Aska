@@ -76,9 +76,13 @@ Além de comandos diretos, perguntas de conteúdo sobre os documentos conhecidos
 
 ### Busca textual literal confinada — `implemented`
 
-A primeira busca dentro de arquivos é literal, sem distinção de caixa, read-only e confinada ao workspace. `SearchTextCapability` compõe internamente as políticas existentes de listagem e leitura e retorna correspondências tipadas com caminho relativo, linha e trecho, sob limites de arquivos, profundidade, tamanho, query, resultados e trecho. Não há regex, fuzzy matching, busca semântica, embeddings ou índice persistente.
+A primeira busca dentro do conteúdo de arquivos é literal, sem distinção de caixa, read-only e confinada ao workspace. `SearchTextCapability` compõe internamente as políticas existentes de listagem e leitura e retorna correspondências tipadas com caminho relativo, linha e trecho, sob limites de arquivos, profundidade, tamanho, query, resultados e trecho. Não há regex, busca semântica, embeddings ou índice persistente.
 
 `SearchTextIntent` e seu intérprete pertencem a `packages/conversation/natural_search.py`; termos entre aspas usam extração determinística e paráfrases claras passam por gate próprio e JSON estrito. `NaturalFileSearchHandler` permanece separado do handler de leitura/listagem e roda antes dele no CLI. Zero resultados e falhas são apresentados localmente; somente correspondências não vazias entram como contexto temporário não confiável para a resposta atual e não são copiadas para o histórico.
+
+### Sugestão aproximada de nome sem seleção automática — `implemented`
+
+Quando uma localização explícita por nome e extensão não encontra resultado exato, o CLI pode sugerir caminhos semelhantes da mesma extensão. A comparação é local e pura, normaliza caixa e acentos, reconhece plurais simples e usa `difflib.SequenceMatcher` com corte e quantidade limitados. Sugestões não são leitura, busca semântica ou autorização: o modelo não é chamado, nenhum arquivo é escolhido ou aberto automaticamente e todas as candidatas já passaram pela listagem confinada ao workspace.
 
 ## Decisões substituídas, rejeitadas ou adiadas
 

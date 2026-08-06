@@ -3,6 +3,7 @@ from capabilities.filesystem.lister import (
     ListFilesResult,
     ListFilesStatus,
 )
+from capabilities.filesystem.name_matcher import suggest_similar_file_paths
 from capabilities.filesystem.reader import (
     ReadTextFileCapability,
     ReadTextFileResult,
@@ -26,4 +27,5 @@ __all__ = [
     "SearchTextResult",
     "SearchTextStatus",
     "TextSearchMatch",
+    "suggest_similar_file_paths",
 ]
